@@ -1,4 +1,4 @@
-import { addDoc, collection, getDocs } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs } from "firebase/firestore";
 import {
   createContext,
   useContext,
@@ -28,6 +28,7 @@ type PotContextValue = {
     note?: string;
   }) => Promise<void>;
   addPerson: (name: string) => Promise<void>;
+  deleteTransaction: (transactionId: string) => Promise<void>;
 };
 
 const STARTING_BALANCE = 240;
@@ -91,6 +92,14 @@ export function PotProvider({ children }: { children: ReactNode }) {
     setPeople((prev) => [...prev, newPerson]);
   };
 
+  const deleteTransaction = async (transactionId: string) => {
+  setTransactions((prev) =>
+    prev.filter((transaction) => transaction.id !== transactionId)
+  );
+
+  await deleteDoc(doc(db, "transactions", transactionId));
+};
+
   const balance = useMemo(() => {
     return getCurrentBalance(STARTING_BALANCE, transactions);
   }, [transactions]);
@@ -108,6 +117,7 @@ export function PotProvider({ children }: { children: ReactNode }) {
       isLoading,
       addTransaction,
       addPerson,
+      deleteTransaction
     }),
     [balance, owed, people, transactions, isLoading],
   );

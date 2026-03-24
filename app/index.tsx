@@ -18,8 +18,15 @@ import { usePot } from "../context/PotContext";
 import { getPersonBalances } from "../utils/pot";
 
 export default function HomeScreen() {
-  const { balance, owed, transactions, isLoading, people, addPerson } =
-    usePot();
+  const {
+    balance,
+    owed,
+    transactions,
+    isLoading,
+    people,
+    addPerson,
+    deleteTransaction,
+  } = usePot();
 
   const handleAddPerson = async () => {
     const trimmed = newPersonName.trim();
@@ -44,6 +51,28 @@ export default function HomeScreen() {
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
+
+  const handleDeleteTransaction = (transactionId: string) => {
+    Alert.alert(
+      "Delete transaction",
+      "Are you sure you want to delete this transaction?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteTransaction(transactionId);
+            } catch (error) {
+              console.error("Failed to delete transaction:", error);
+              Alert.alert("Error", "Could not delete transaction.");
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -106,7 +135,11 @@ export default function HomeScreen() {
             <Text style={styles.emptyText}>No transactions yet.</Text>
           ) : (
             transactions.map((transaction) => (
-              <View key={transaction.id} style={styles.transactionRow}>
+              <TouchableOpacity
+                key={transaction.id}
+                style={styles.transactionRow}
+                onPress={() => handleDeleteTransaction(transaction.id)}
+              >
                 <View style={styles.transactionLeft}>
                   <Text style={styles.transactionTitle}>
                     {transaction.personName}{" "}
@@ -135,7 +168,7 @@ export default function HomeScreen() {
                   {transaction.type === "take" ? "-" : "+"}£
                   {transaction.amount.toFixed(2)}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
