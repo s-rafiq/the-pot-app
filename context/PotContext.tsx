@@ -1,4 +1,10 @@
-import { addDoc, collection, deleteDoc, doc, getDocs } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+} from "firebase/firestore";
 import {
   createContext,
   useContext,
@@ -53,8 +59,17 @@ export function PotProvider({ children }: { children: ReactNode }) {
   }) => {
     const createdAt = new Date().toISOString();
 
+    const docRef = await addDoc(collection(db, "transactions"), {
+      personId: person.id,
+      personName: person.name,
+      type,
+      amount,
+      note: note?.trim() ? note.trim() : null,
+      createdAt,
+    });
+
     const newTransaction: Transaction = {
-      id: Date.now().toString(),
+      id: docRef.id,
       personId: person.id,
       personName: person.name,
       type,
@@ -64,15 +79,6 @@ export function PotProvider({ children }: { children: ReactNode }) {
     };
 
     setTransactions((prev) => [newTransaction, ...prev]);
-
-    await addDoc(collection(db, "transactions"), {
-      personId: person.id,
-      personName: person.name,
-      type,
-      amount,
-      note: note?.trim() ? note.trim() : null,
-      createdAt,
-    });
   };
 
   const addPerson = async (name: string) => {
@@ -93,12 +99,12 @@ export function PotProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteTransaction = async (transactionId: string) => {
-  setTransactions((prev) =>
-    prev.filter((transaction) => transaction.id !== transactionId)
-  );
+    setTransactions((prev) =>
+      prev.filter((transaction) => transaction.id !== transactionId),
+    );
 
-  await deleteDoc(doc(db, "transactions", transactionId));
-};
+    await deleteDoc(doc(db, "transactions", transactionId));
+  };
 
   const balance = useMemo(() => {
     return getCurrentBalance(STARTING_BALANCE, transactions);
@@ -117,7 +123,7 @@ export function PotProvider({ children }: { children: ReactNode }) {
       isLoading,
       addTransaction,
       addPerson,
-      deleteTransaction
+      deleteTransaction,
     }),
     [balance, owed, people, transactions, isLoading],
   );
