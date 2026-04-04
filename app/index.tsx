@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ActionButton } from "../components/ActionButton";
 import { SummaryCard } from "../components/SummaryCard";
 import { usePot } from "../context/PotContext";
+import { formatTransactionDate } from "../utils/date";
 import { getPersonBalances } from "../utils/pot";
 
 export default function HomeScreen() {
@@ -110,12 +111,16 @@ export default function HomeScreen() {
               const personBalance = personBalances[person.id] ?? 0;
 
               return (
-                <View key={person.id} style={styles.personBalanceRow}>
+                <TouchableOpacity
+                  key={person.id}
+                  style={styles.personBalanceRow}
+                  onPress={() => router.push(`/person/${person.id}`)}
+                >
                   <Text style={styles.personName}>{person.name}</Text>
                   <Text style={styles.personBalance}>
                     £{personBalance.toFixed(2)}
                   </Text>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -148,7 +153,7 @@ export default function HomeScreen() {
                       : "repaid pot"}
                   </Text>
                   <Text style={styles.transactionDate}>
-                    {transaction.createdAt}
+                    {formatTransactionDate(transaction.createdAt)}
                   </Text>
                   {transaction.note ? (
                     <Text style={styles.transactionNote}>
