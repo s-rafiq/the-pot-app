@@ -16,16 +16,20 @@ import {
 import { db } from "../lib/firebase";
 import type {
   Person,
+  PreviousDebtEntry,
+  PreviousDebtEntryType,
   Transaction,
   TransactionType,
 } from "../types/transaction";
-import { getCurrentBalance, getTotalOwed } from "../utils/pot";
+import { getCurrentBalance, getPreviousDebtTotal, getTotalOwed } from "../utils/pot";
 
 type PotContextValue = {
   balance: number;
   owed: number;
+  previousOwed: number;
   people: Person[];
   transactions: Transaction[];
+  previousDebtEntries: PreviousDebtEntry[];
   isLoading: boolean;
   addTransaction: (input: {
     person: Person;
@@ -35,6 +39,12 @@ type PotContextValue = {
   }) => Promise<void>;
   addPerson: (name: string) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
+  addPreviousDebtEntry: (input: {
+    person: Person;
+    type: PreviousDebtEntryType;
+    amount: number;
+    note?: string;
+  }) => Promise<void>;
 };
 
 const STARTING_BALANCE = 240;
@@ -44,6 +54,7 @@ const PotContext = createContext<PotContextValue | undefined>(undefined);
 export function PotProvider({ children }: { children: ReactNode }) {
   const [people, setPeople] = useState<Person[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [previousDebtEntries, setPreviousDebtEntries] = useState<PreviousDebtEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const addTransaction = async ({
@@ -106,6 +117,41 @@ export function PotProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, "transactions", transactionId));
   };
 
+  const addPreviousDebtEntry = async ({
+    person,
+    type,
+    amount,
+    note,
+  }: {
+    person: Person;
+    type: PreviousDebtEntryType;
+    amount: number;
+    note?: string;
+  }) => {
+    const createdAt = new Date().toISOString();
+
+    const docRef = await addDoc(collection(db, "previousDebts"), {
+      personId: person.id,
+      personName: person.name,
+      type,
+      amount,
+      note: note?.trim() ? note.trim() : null,
+      createdAt,
+    });
+
+    const newEntry: PreviousDebtEntry = {
+      id: docRef.id,
+      personId: person.id,
+      personName: person.name,
+      type,
+      amount,
+      note: note?.trim() ? note.trim() : undefined,
+      createdAt,
+    };
+
+    setPreviousDebtEntries((prev) => [newEntry, ...prev]);
+  };
+
   const balance = useMemo(() => {
     return getCurrentBalance(STARTING_BALANCE, transactions);
   }, [transactions]);
@@ -114,18 +160,33 @@ export function PotProvider({ children }: { children: ReactNode }) {
     return getTotalOwed(transactions);
   }, [transactions]);
 
+  const previousOwed = useMemo(() => {
+    return getPreviousDebtTotal(previousDebtEntries);
+  }, [previousDebtEntries]);
+
   const value = useMemo(
     () => ({
       balance,
       owed,
+      previousOwed,
       people,
       transactions,
+      previousDebtEntries,
       isLoading,
       addTransaction,
       addPerson,
       deleteTransaction,
+      addPreviousDebtEntry,
     }),
-    [balance, owed, people, transactions, isLoading],
+    [
+      balance,
+      owed,
+      previousOwed,
+      people,
+      transactions,
+      previousDebtEntries,
+      isLoading,
+    ],
   );
 
   useEffect(() => {
@@ -165,8 +226,31 @@ export function PotProvider({ children }: { children: ReactNode }) {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
 
+        const previousDebtSnapshot = await getDocs(collection(db, "previousDebts"));
+        const loadedPreviousDebtEntries: PreviousDebtEntry[] = previousDebtSnapshot.docs.map(
+          (doc) => {
+            const data = doc.data();
+
+            return {
+              id: doc.id,
+              personId: data.personId,
+              personName: data.personName,
+              type: data.type,
+              amount: data.amount,
+              note: data.note ?? undefined,
+              createdAt: data.createdAt,
+            } as PreviousDebtEntry;
+          },
+        );
+
+        loadedPreviousDebtEntries.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+
         setPeople(loadedPeople);
         setTransactions(loadedTransactions);
+        setPreviousDebtEntries(loadedPreviousDebtEntries);
       } catch (error) {
         console.error("Failed to load pot data:", error);
       } finally {

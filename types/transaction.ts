@@ -1,4 +1,4 @@
-export type TransactionType = 'take' | 'repay';
+export type TransactionType = "take" | "repay";
 
 export type Person = {
   id: string;
@@ -10,6 +10,17 @@ export type Transaction = {
   personId: string;
   personName: string;
   type: TransactionType;
+  amount: number;
+  note?: string;
+  createdAt: string;
+};
+export type PreviousDebtEntryType = "debt" | "repay";
+
+export type PreviousDebtEntry = {
+  id: string;
+  personId: string;
+  personName: string;
+  type: PreviousDebtEntryType;
   amount: number;
   note?: string;
   createdAt: string;
