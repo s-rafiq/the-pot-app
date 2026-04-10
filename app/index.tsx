@@ -19,16 +19,16 @@ import { formatTransactionDate } from "../utils/date";
 import { getPersonBalances } from "../utils/pot";
 
 export default function HomeScreen() {
-const {
-  balance,
-  owed,
-  previousOwed,
-  transactions,
-  isLoading,
-  people,
-  addPerson,
-  deleteTransaction
-} = usePot();
+  const {
+    balance,
+    owed,
+    previousOwed,
+    transactions,
+    isLoading,
+    people,
+    addPerson,
+    deleteTransaction,
+  } = usePot();
 
   const handleAddPerson = async () => {
     const trimmed = newPersonName.trim();
@@ -87,25 +87,22 @@ const {
           value={`£${balance.toFixed(2)}`}
         />
 
-<SummaryCard
-  label="Current Pot Owed"
-  value={`£${owed.toFixed(2)}`}
-/>
+        <SummaryCard label="Current Pot Owed" value={`£${owed.toFixed(2)}`} />
 
-<SummaryCard
-  label="Previously Owed"
-  value={`£${previousOwed.toFixed(2)}`}
-/>
+        <SummaryCard
+          label="Previously Owed"
+          value={`£${previousOwed.toFixed(2)}`}
+        />
 
-<SummaryCard
-  label="Grand Total Owed"
-  value={`£${grandTotalOwed.toFixed(2)}`}
-/>
+        <SummaryCard
+          label="Grand Total Owed"
+          value={`£${grandTotalOwed.toFixed(2)}`}
+        />
 
-<SummaryCard
-  label="Net total balance"
-  value={`£${(balance + grandTotalOwed).toFixed(2)}`}
-/>
+        <SummaryCard
+          label="Net total balance"
+          value={`£${(balance + grandTotalOwed).toFixed(2)}`}
+        />
 
         <View style={styles.buttonRow}>
           <ActionButton

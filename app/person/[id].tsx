@@ -26,7 +26,7 @@ export default function PersonScreen() {
       personTransactions.reduce((total, t) => {
         if (t.type === "take") return total + t.amount;
         return total - t.amount;
-      }, 0)
+      }, 0),
     );
   }, [personTransactions]);
 
@@ -36,7 +36,7 @@ export default function PersonScreen() {
       personPreviousDebtEntries.reduce((total, entry) => {
         if (entry.type === "debt") return total + entry.amount;
         return total - entry.amount;
-      }, 0)
+      }, 0),
     );
   }, [personPreviousDebtEntries]);
 
@@ -67,7 +67,9 @@ export default function PersonScreen() {
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total Owed Overall</Text>
-          <Text style={styles.summaryValue}>£{totalOwedOverall.toFixed(2)}</Text>
+          <Text style={styles.summaryValue}>
+            £{totalOwedOverall.toFixed(2)}
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -131,8 +133,7 @@ export default function PersonScreen() {
                     color: entry.type === "debt" ? "#b42318" : "#067647",
                   }}
                 >
-                  {entry.type === "debt" ? "+" : "-"}£
-                  {entry.amount.toFixed(2)}
+                  {entry.type === "debt" ? "+" : "-"}£{entry.amount.toFixed(2)}
                 </Text>
               </View>
             ))
