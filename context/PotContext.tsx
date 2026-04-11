@@ -3,7 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDocs,
+  onSnapshot,
 } from "firebase/firestore";
 import {
   createContext,
@@ -15,13 +15,20 @@ import {
 } from "react";
 import { db } from "../lib/firebase";
 import type {
+  FundingEvent,
+  FundingEventDeduction,
   Person,
   PreviousDebtEntry,
   PreviousDebtEntryType,
   Transaction,
   TransactionType,
 } from "../types/transaction";
-import { getCurrentBalance, getPreviousDebtTotal, getTotalOwed } from "../utils/pot";
+import {
+  getCurrentBalance,
+  getPreviousDebtTotal,
+  getTotalFundingNet,
+  getTotalOwed,
+} from "../utils/pot";
 
 type PotContextValue = {
   balance: number;
@@ -30,6 +37,8 @@ type PotContextValue = {
   people: Person[];
   transactions: Transaction[];
   previousDebtEntries: PreviousDebtEntry[];
+  fundingEvents: FundingEvent[];
+  fundingEventDeductions: FundingEventDeduction[];
   isLoading: boolean;
   addTransaction: (input: {
     person: Person;
@@ -45,6 +54,12 @@ type PotContextValue = {
     amount: number;
     note?: string;
   }) => Promise<void>;
+  addFundingEvent: (input: {
+    title: string;
+    grossAmount: number;
+    note?: string;
+    deductions: { label: string; amount: number }[];
+  }) => Promise<void>;
 };
 
 const STARTING_BALANCE = 240;
@@ -54,7 +69,13 @@ const PotContext = createContext<PotContextValue | undefined>(undefined);
 export function PotProvider({ children }: { children: ReactNode }) {
   const [people, setPeople] = useState<Person[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [previousDebtEntries, setPreviousDebtEntries] = useState<PreviousDebtEntry[]>([]);
+  const [previousDebtEntries, setPreviousDebtEntries] = useState<
+    PreviousDebtEntry[]
+  >([]);
+  const [fundingEvents, setFundingEvents] = useState<FundingEvent[]>([]);
+  const [fundingEventDeductions, setFundingEventDeductions] = useState<
+    FundingEventDeduction[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const addTransaction = async ({
@@ -70,7 +91,7 @@ export function PotProvider({ children }: { children: ReactNode }) {
   }) => {
     const createdAt = new Date().toISOString();
 
-    const docRef = await addDoc(collection(db, "transactions"), {
+    await addDoc(collection(db, "transactions"), {
       personId: person.id,
       personName: person.name,
       type,
@@ -78,18 +99,6 @@ export function PotProvider({ children }: { children: ReactNode }) {
       note: note?.trim() ? note.trim() : null,
       createdAt,
     });
-
-    const newTransaction: Transaction = {
-      id: docRef.id,
-      personId: person.id,
-      personName: person.name,
-      type,
-      amount,
-      note: note?.trim() ? note.trim() : undefined,
-      createdAt,
-    };
-
-    setTransactions((prev) => [newTransaction, ...prev]);
   };
 
   const addPerson = async (name: string) => {
@@ -97,23 +106,12 @@ export function PotProvider({ children }: { children: ReactNode }) {
 
     if (!trimmedName) return;
 
-    const docRef = await addDoc(collection(db, "people"), {
+    await addDoc(collection(db, "people"), {
       name: trimmedName,
     });
-
-    const newPerson: Person = {
-      id: docRef.id,
-      name: trimmedName,
-    };
-
-    setPeople((prev) => [...prev, newPerson]);
   };
 
   const deleteTransaction = async (transactionId: string) => {
-    setTransactions((prev) =>
-      prev.filter((transaction) => transaction.id !== transactionId),
-    );
-
     await deleteDoc(doc(db, "transactions", transactionId));
   };
 
@@ -130,7 +128,7 @@ export function PotProvider({ children }: { children: ReactNode }) {
   }) => {
     const createdAt = new Date().toISOString();
 
-    const docRef = await addDoc(collection(db, "previousDebts"), {
+    await addDoc(collection(db, "previousDebts"), {
       personId: person.id,
       personName: person.name,
       type,
@@ -138,23 +136,45 @@ export function PotProvider({ children }: { children: ReactNode }) {
       note: note?.trim() ? note.trim() : null,
       createdAt,
     });
-
-    const newEntry: PreviousDebtEntry = {
-      id: docRef.id,
-      personId: person.id,
-      personName: person.name,
-      type,
-      amount,
-      note: note?.trim() ? note.trim() : undefined,
-      createdAt,
-    };
-
-    setPreviousDebtEntries((prev) => [newEntry, ...prev]);
   };
 
+  const addFundingEvent = async ({
+    title,
+    grossAmount,
+    note,
+    deductions,
+  }: {
+    title: string;
+    grossAmount: number;
+    note?: string;
+    deductions: { label: string; amount: number }[];
+  }) => {
+    const createdAt = new Date().toISOString();
+
+    const eventRef = await addDoc(collection(db, "fundingEvents"), {
+      title,
+      grossAmount,
+      note: note?.trim() ? note.trim() : null,
+      createdAt,
+    });
+
+    for (const deduction of deductions) {
+      await addDoc(collection(db, "fundingEventDeductions"), {
+        eventId: eventRef.id,
+        label: deduction.label,
+        amount: deduction.amount,
+        createdAt,
+      });
+    }
+  };
+
+  const totalFunding = useMemo(() => {
+    return getTotalFundingNet(fundingEvents, fundingEventDeductions);
+  }, [fundingEvents, fundingEventDeductions]);
+
   const balance = useMemo(() => {
-    return getCurrentBalance(STARTING_BALANCE, transactions);
-  }, [transactions]);
+    return getCurrentBalance(STARTING_BALANCE + totalFunding, transactions);
+  }, [transactions, totalFunding]);
 
   const owed = useMemo(() => {
     return getTotalOwed(transactions);
@@ -172,11 +192,14 @@ export function PotProvider({ children }: { children: ReactNode }) {
       people,
       transactions,
       previousDebtEntries,
+      fundingEvents,
+      fundingEventDeductions,
       isLoading,
       addTransaction,
       addPerson,
       deleteTransaction,
       addPreviousDebtEntry,
+      addFundingEvent,
     }),
     [
       balance,
@@ -185,52 +208,91 @@ export function PotProvider({ children }: { children: ReactNode }) {
       people,
       transactions,
       previousDebtEntries,
+      fundingEvents,
+      fundingEventDeductions,
       isLoading,
     ],
   );
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const peopleSnapshot = await getDocs(collection(db, "people"));
-        const loadedPeople: Person[] = peopleSnapshot.docs.map((doc) => {
-          const data = doc.data();
+    let peopleLoaded = false;
+    let transactionsLoaded = false;
+    let previousDebtLoaded = false;
+    let fundingLoaded = false;
+    let deductionsLoaded = false;
 
+    const updateLoadingState = () => {
+      if (
+        peopleLoaded &&
+        transactionsLoaded &&
+        previousDebtLoaded &&
+        fundingLoaded &&
+        deductionsLoaded
+      ) {
+        setIsLoading(false);
+      }
+    };
+
+    const unsubscribePeople = onSnapshot(
+      collection(db, "people"),
+      (snapshot) => {
+        const loadedPeople: Person[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
           return {
             id: doc.id,
             name: data.name,
           };
         });
 
-        const transactionSnapshot = await getDocs(
-          collection(db, "transactions"),
-        );
-        const loadedTransactions: Transaction[] = transactionSnapshot.docs.map(
-          (doc) => {
-            const data = doc.data();
+        setPeople(loadedPeople);
+        peopleLoaded = true;
+        updateLoadingState();
+      },
+      (error) => {
+        console.error("Failed to listen to people:", error);
+        peopleLoaded = true;
+        updateLoadingState();
+      },
+    );
 
-            return {
-              id: doc.id,
-              personId: data.personId,
-              personName: data.personName,
-              type: data.type,
-              amount: data.amount,
-              note: data.note ?? undefined,
-              createdAt: data.createdAt,
-            } as Transaction;
-          },
-        );
+    const unsubscribeTransactions = onSnapshot(
+      collection(db, "transactions"),
+      (snapshot) => {
+        const loadedTransactions: Transaction[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            personId: data.personId,
+            personName: data.personName,
+            type: data.type,
+            amount: data.amount,
+            note: data.note ?? undefined,
+            createdAt: data.createdAt,
+          } as Transaction;
+        });
 
         loadedTransactions.sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
 
-        const previousDebtSnapshot = await getDocs(collection(db, "previousDebts"));
-        const loadedPreviousDebtEntries: PreviousDebtEntry[] = previousDebtSnapshot.docs.map(
-          (doc) => {
-            const data = doc.data();
+        setTransactions(loadedTransactions);
+        transactionsLoaded = true;
+        updateLoadingState();
+      },
+      (error) => {
+        console.error("Failed to listen to transactions:", error);
+        transactionsLoaded = true;
+        updateLoadingState();
+      },
+    );
 
+    const unsubscribePreviousDebt = onSnapshot(
+      collection(db, "previousDebts"),
+      (snapshot) => {
+        const loadedPreviousDebtEntries: PreviousDebtEntry[] =
+          snapshot.docs.map((doc) => {
+            const data = doc.data();
             return {
               id: doc.id,
               personId: data.personId,
@@ -240,25 +302,88 @@ export function PotProvider({ children }: { children: ReactNode }) {
               note: data.note ?? undefined,
               createdAt: data.createdAt,
             } as PreviousDebtEntry;
-          },
-        );
+          });
 
         loadedPreviousDebtEntries.sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
 
-        setPeople(loadedPeople);
-        setTransactions(loadedTransactions);
         setPreviousDebtEntries(loadedPreviousDebtEntries);
-      } catch (error) {
-        console.error("Failed to load pot data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        previousDebtLoaded = true;
+        updateLoadingState();
+      },
+      (error) => {
+        console.error("Failed to listen to previous debts:", error);
+        previousDebtLoaded = true;
+        updateLoadingState();
+      },
+    );
 
-    loadData();
+    const unsubscribeFunding = onSnapshot(
+      collection(db, "fundingEvents"),
+      (snapshot) => {
+        const loadedFundingEvents: FundingEvent[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title,
+            grossAmount: data.grossAmount,
+            note: data.note ?? undefined,
+            createdAt: data.createdAt,
+          };
+        });
+
+        loadedFundingEvents.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+
+        setFundingEvents(loadedFundingEvents);
+        fundingLoaded = true;
+        updateLoadingState();
+      },
+      (error) => {
+        console.error("Failed to listen to funding events:", error);
+        fundingLoaded = true;
+        updateLoadingState();
+      },
+    );
+
+    const unsubscribeDeductions = onSnapshot(
+      collection(db, "fundingEventDeductions"),
+      (snapshot) => {
+        const loadedDeductions: FundingEventDeduction[] = snapshot.docs.map(
+          (doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              eventId: data.eventId,
+              label: data.label,
+              amount: data.amount,
+              createdAt: data.createdAt,
+            };
+          },
+        );
+
+        setFundingEventDeductions(loadedDeductions);
+        deductionsLoaded = true;
+        updateLoadingState();
+      },
+      (error) => {
+        console.error("Failed to listen to funding deductions:", error);
+        deductionsLoaded = true;
+        updateLoadingState();
+      },
+    );
+
+    return () => {
+      unsubscribePeople();
+      unsubscribeTransactions();
+      unsubscribePreviousDebt();
+      unsubscribeFunding();
+      unsubscribeDeductions();
+    };
   }, []);
 
   return <PotContext.Provider value={value}>{children}</PotContext.Provider>;

@@ -16,7 +16,7 @@ import { ActionButton } from "../components/ActionButton";
 import { SummaryCard } from "../components/SummaryCard";
 import { usePot } from "../context/PotContext";
 import { formatTransactionDate } from "../utils/date";
-import { getPersonBalances } from "../utils/pot";
+import { getFundingEventTotals, getPersonBalances } from "../utils/pot";
 
 export default function HomeScreen() {
   const {
@@ -28,6 +28,8 @@ export default function HomeScreen() {
     people,
     addPerson,
     deleteTransaction,
+    fundingEvents,
+    fundingEventDeductions,
   } = usePot();
 
   const handleAddPerson = async () => {
@@ -52,6 +54,12 @@ export default function HomeScreen() {
   }, [people, transactions]);
 
   const grandTotalOwed = owed + previousOwed;
+
+  const totalFundingNet = fundingEvents.reduce((sum, event) => {
+    const { net } = getFundingEventTotals(event, fundingEventDeductions);
+    return sum + net;
+  }, 0);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
 
@@ -100,8 +108,8 @@ export default function HomeScreen() {
         />
 
         <SummaryCard
-          label="Net total balance"
-          value={`£${(balance + grandTotalOwed).toFixed(2)}`}
+          label="Total Net Funding"
+          value={`£${totalFundingNet.toFixed(2)}`}
         />
 
         <View style={styles.buttonRow}>
@@ -119,11 +127,19 @@ export default function HomeScreen() {
             variant="secondary"
           />
         </View>
+
         <ActionButton
           label="Previously Owed"
           onPress={() => router.push("/previous-debt")}
           variant="secondary"
         />
+
+        <ActionButton
+          label="Funding Events"
+          onPress={() => router.push("/funding-event")}
+          variant="secondary"
+        />
+
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>People</Text>
           {people.length === 0 ? (
@@ -151,6 +167,42 @@ export default function HomeScreen() {
             onPress={() => setIsModalVisible(true)}
             variant="secondary"
           />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Funding Events</Text>
+
+          {fundingEvents.length === 0 ? (
+            <Text style={styles.emptyText}>No funding events yet.</Text>
+          ) : (
+            fundingEvents.map((event) => {
+              const { deductions, net } = getFundingEventTotals(
+                event,
+                fundingEventDeductions
+              );
+
+              return (
+                <View key={event.id} style={styles.transactionRow}>
+                  <View style={styles.transactionLeft}>
+                    <Text style={styles.transactionTitle}>{event.title}</Text>
+                    <Text style={styles.transactionDate}>
+                      {formatTransactionDate(event.createdAt)}
+                    </Text>
+                    {event.note ? (
+                      <Text style={styles.transactionNote}>{event.note}</Text>
+                    ) : null}
+                    <Text style={styles.transactionNote}>
+                      Deductions: £{deductions.toFixed(2)}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.transactionAmount, styles.repayAmount]}>
+                    +£{net.toFixed(2)}
+                  </Text>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.card}>
@@ -200,6 +252,7 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
+
       <Modal visible={isModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>

@@ -25,3 +25,19 @@ export type PreviousDebtEntry = {
   note?: string;
   createdAt: string;
 };
+
+export type FundingEvent = {
+  id: string;
+  title: string;
+  grossAmount: number;
+  note?: string;
+  createdAt: string;
+};
+
+export type FundingEventDeduction = {
+  id: string;
+  eventId: string;
+  label: string;
+  amount: number;
+  createdAt: string;
+};

@@ -2,6 +2,8 @@ import type {
   Person,
   PreviousDebtEntry,
   Transaction,
+  FundingEvent,
+  FundingEventDeduction,
 } from "../types/transaction";
 
 export function getPersonBalances(
@@ -94,4 +96,36 @@ export function getPreviousDebtBalances(
   }
 
   return totals;
+}
+
+export function getFundingEventTotals(
+  event: FundingEvent,
+  deductions: FundingEventDeduction[]
+) {
+  const eventDeductions = deductions.filter(
+    (d) => d.eventId === event.id
+  );
+
+  const totalDeductions = eventDeductions.reduce(
+    (sum, d) => sum + d.amount,
+    0
+  );
+
+  const netAmount = event.grossAmount - totalDeductions;
+
+  return {
+    gross: event.grossAmount,
+    deductions: totalDeductions,
+    net: netAmount,
+  };
+}
+
+export function getTotalFundingNet(
+  events: FundingEvent[],
+  deductions: FundingEventDeduction[]
+) {
+  return events.reduce((total, event) => {
+    const { net } = getFundingEventTotals(event, deductions);
+    return total + net;
+  }, 0);
 }
