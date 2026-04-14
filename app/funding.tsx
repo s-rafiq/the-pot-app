@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,8 +14,30 @@ import { formatTransactionDate } from "../utils/date";
 import { getFundingEventTotals } from "../utils/pot";
 
 export default function FundingScreen() {
-  const { fundingEvents, fundingEventDeductions } = usePot();
+  const { fundingEvents, fundingEventDeductions, deleteFundingEvent } =
+    usePot();
 
+  const handleDeleteFundingEvent = (eventId: string, title: string) => {
+    Alert.alert(
+      "Delete funding event",
+      `Are you sure you want to delete "${title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteFundingEvent(eventId);
+            } catch (error) {
+              console.error("Failed to delete funding event:", error);
+              Alert.alert("Error", "Could not delete funding event.");
+            }
+          },
+        },
+      ],
+    );
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -59,7 +82,25 @@ export default function FundingScreen() {
                     </Text>
                   </View>
 
-                  <Text style={styles.netAmount}>+£{net.toFixed(2)}</Text>
+                  <View style={styles.rightActions}>
+                    <Text style={styles.netAmount}>+£{net.toFixed(2)}</Text>
+
+                    <TouchableOpacity
+                      onPress={() => router.push(`/edit-funding/${event.id}`)}
+                      style={styles.actionButton}
+                    >
+                      <Text style={styles.editText}>Edit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() =>
+                        handleDeleteFundingEvent(event.id, event.title)
+                      }
+                      style={styles.actionButton}
+                    >
+                      <Text style={styles.deleteText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })
@@ -148,5 +189,25 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: "#666",
+  },
+  rightActions: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+
+  actionButton: {
+    paddingVertical: 4,
+  },
+
+  editText: {
+    color: "#111",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
+  deleteText: {
+    color: "#b42318",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

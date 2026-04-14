@@ -69,21 +69,35 @@ type PotContextValue = {
     note?: string;
   }) => Promise<void>;
   updatePreviousDebtEntry: (
-  entryId: string,
-  updates: {
-    personId: string;
-    personName: string;
-    type: PreviousDebtEntryType;
-    amount: number;
-    note?: string;
-  }
-) => Promise<void>;
+    entryId: string,
+    updates: {
+      personId: string;
+      personName: string;
+      type: PreviousDebtEntryType;
+      amount: number;
+      note?: string;
+    },
+  ) => Promise<void>;
   addFundingEvent: (input: {
     title: string;
     grossAmount: number;
     note?: string;
     deductions: { label: string; amount: number }[];
   }) => Promise<void>;
+  updateFundingEvent: (
+    eventId: string,
+    updates: {
+      title: string;
+      grossAmount: number;
+      note?: string;
+      deductions: {
+        id?: string;
+        label: string;
+        amount: number;
+      }[];
+    },
+  ) => Promise<void>;
+  deleteFundingEvent: (eventId: string) => Promise<void>;
 };
 
 const STARTING_BALANCE = 240;
@@ -200,23 +214,23 @@ export function PotProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePreviousDebtEntry = async (
-  entryId: string,
-  updates: {
-    personId: string;
-    personName: string;
-    type: PreviousDebtEntryType;
-    amount: number;
-    note?: string;
-  }
-) => {
-  await updateDoc(doc(db, "previousDebts", entryId), {
-    personId: updates.personId,
-    personName: updates.personName,
-    type: updates.type,
-    amount: updates.amount,
-    note: updates.note?.trim() ? updates.note.trim() : null,
-  });
-};
+    entryId: string,
+    updates: {
+      personId: string;
+      personName: string;
+      type: PreviousDebtEntryType;
+      amount: number;
+      note?: string;
+    },
+  ) => {
+    await updateDoc(doc(db, "previousDebts", entryId), {
+      personId: updates.personId,
+      personName: updates.personName,
+      type: updates.type,
+      amount: updates.amount,
+      note: updates.note?.trim() ? updates.note.trim() : null,
+    });
+  };
 
   const addFundingEvent = async ({
     title,
@@ -246,6 +260,70 @@ export function PotProvider({ children }: { children: ReactNode }) {
         createdAt,
       });
     }
+  };
+
+  const updateFundingEvent = async (
+    eventId: string,
+    updates: {
+      title: string;
+      grossAmount: number;
+      note?: string;
+      deductions: {
+        id?: string;
+        label: string;
+        amount: number;
+      }[];
+    },
+  ) => {
+    await updateDoc(doc(db, "fundingEvents", eventId), {
+      title: updates.title,
+      grossAmount: updates.grossAmount,
+      note: updates.note?.trim() ? updates.note.trim() : null,
+    });
+
+    const existingDeductions = fundingEventDeductions.filter(
+      (deduction) => deduction.eventId === eventId,
+    );
+
+    const incomingIds = updates.deductions
+      .filter((deduction) => deduction.id)
+      .map((deduction) => deduction.id as string);
+
+    const deductionsToDelete = existingDeductions.filter(
+      (deduction) => !incomingIds.includes(deduction.id),
+    );
+
+    for (const deduction of deductionsToDelete) {
+      await deleteDoc(doc(db, "fundingEventDeductions", deduction.id));
+    }
+
+    for (const deduction of updates.deductions) {
+      if (deduction.id) {
+        await updateDoc(doc(db, "fundingEventDeductions", deduction.id), {
+          label: deduction.label,
+          amount: deduction.amount,
+        });
+      } else {
+        await addDoc(collection(db, "fundingEventDeductions"), {
+          eventId,
+          label: deduction.label,
+          amount: deduction.amount,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+  };
+
+  const deleteFundingEvent = async (eventId: string) => {
+    const relatedDeductions = fundingEventDeductions.filter(
+      (deduction) => deduction.eventId === eventId,
+    );
+
+    for (const deduction of relatedDeductions) {
+      await deleteDoc(doc(db, "fundingEventDeductions", deduction.id));
+    }
+
+    await deleteDoc(doc(db, "fundingEvents", eventId));
   };
 
   const totalFunding = useMemo(() => {
@@ -284,6 +362,8 @@ export function PotProvider({ children }: { children: ReactNode }) {
     deletePerson,
     deletePreviousDebtEntry,
     addFundingEvent,
+    updateFundingEvent,
+    deleteFundingEvent,
   };
 
   useEffect(() => {
