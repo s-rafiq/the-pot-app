@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -15,16 +15,12 @@ import { usePot } from "../context/PotContext";
 import type { TransactionType } from "../types/transaction";
 
 export default function AddTransactionScreen() {
-  const params = useLocalSearchParams<{ type?: string }>();
-  const initialType: TransactionType =
-    params.type === "repay" ? "repay" : "take";
-
   const { addTransaction, people } = usePot();
 
   const [selectedPersonId, setSelectedPersonId] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [type, setType] = useState<TransactionType>(initialType);
+  const [type, setType] = useState<TransactionType | "">("");
 
   useEffect(() => {
     if (people.length > 0 && !selectedPersonId) {
@@ -38,13 +34,18 @@ export default function AddTransactionScreen() {
     if (!amount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert(
         "Invalid amount",
-        "Please enter a valid amount greater than 0."
+        "Please enter a valid amount greater than 0.",
       );
       return;
     }
 
+    if (!type) {
+      Alert.alert("No transaction type", "Please choose Take or Repay.");
+      return;
+    }
+
     const selectedPerson = people.find(
-      (person) => person.id === selectedPersonId
+      (person) => person.id === selectedPersonId,
     );
 
     if (!selectedPerson) {

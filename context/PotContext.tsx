@@ -51,12 +51,33 @@ type PotContextValue = {
   updatePerson: (personId: string, name: string) => Promise<void>;
   deletePerson: (personId: string) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
+  updateTransaction: (
+    transactionId: string,
+    updates: {
+      personId: string;
+      personName: string;
+      type: TransactionType;
+      amount: number;
+      note?: string;
+    },
+  ) => Promise<void>;
+  deletePreviousDebtEntry: (entryId: string) => Promise<void>;
   addPreviousDebtEntry: (input: {
     person: Person;
     type: PreviousDebtEntryType;
     amount: number;
     note?: string;
   }) => Promise<void>;
+  updatePreviousDebtEntry: (
+  entryId: string,
+  updates: {
+    personId: string;
+    personName: string;
+    type: PreviousDebtEntryType;
+    amount: number;
+    note?: string;
+  }
+) => Promise<void>;
   addFundingEvent: (input: {
     title: string;
     grossAmount: number;
@@ -132,6 +153,29 @@ export function PotProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, "transactions", transactionId));
   };
 
+  const updateTransaction = async (
+    transactionId: string,
+    updates: {
+      personId: string;
+      personName: string;
+      type: TransactionType;
+      amount: number;
+      note?: string;
+    },
+  ) => {
+    await updateDoc(doc(db, "transactions", transactionId), {
+      personId: updates.personId,
+      personName: updates.personName,
+      type: updates.type,
+      amount: updates.amount,
+      note: updates.note?.trim() ? updates.note.trim() : null,
+    });
+  };
+
+  const deletePreviousDebtEntry = async (entryId: string) => {
+    await deleteDoc(doc(db, "previousDebts", entryId));
+  };
+
   const addPreviousDebtEntry = async ({
     person,
     type,
@@ -154,6 +198,25 @@ export function PotProvider({ children }: { children: ReactNode }) {
       createdAt,
     });
   };
+
+  const updatePreviousDebtEntry = async (
+  entryId: string,
+  updates: {
+    personId: string;
+    personName: string;
+    type: PreviousDebtEntryType;
+    amount: number;
+    note?: string;
+  }
+) => {
+  await updateDoc(doc(db, "previousDebts", entryId), {
+    personId: updates.personId,
+    personName: updates.personName,
+    type: updates.type,
+    amount: updates.amount,
+    note: updates.note?.trim() ? updates.note.trim() : null,
+  });
+};
 
   const addFundingEvent = async ({
     title,
@@ -201,37 +264,27 @@ export function PotProvider({ children }: { children: ReactNode }) {
     return getPreviousDebtTotal(previousDebtEntries);
   }, [previousDebtEntries]);
 
-  const value = useMemo(
-    () => ({
-      balance,
-      owed,
-      previousOwed,
-      people,
-      transactions,
-      previousDebtEntries,
-      fundingEvents,
-      fundingEventDeductions,
-      isLoading,
-      addTransaction,
-      addPerson,
-      deleteTransaction,
-      addPreviousDebtEntry,
-      updatePerson,
-      deletePerson,
-      addFundingEvent,
-    }),
-    [
-      balance,
-      owed,
-      previousOwed,
-      people,
-      transactions,
-      previousDebtEntries,
-      fundingEvents,
-      fundingEventDeductions,
-      isLoading,
-    ],
-  );
+  const value = {
+    balance,
+    owed,
+    previousOwed,
+    people,
+    transactions,
+    previousDebtEntries,
+    fundingEvents,
+    fundingEventDeductions,
+    isLoading,
+    addTransaction,
+    addPerson,
+    deleteTransaction,
+    updateTransaction,
+    addPreviousDebtEntry,
+    updatePreviousDebtEntry,
+    updatePerson,
+    deletePerson,
+    deletePreviousDebtEntry,
+    addFundingEvent,
+  };
 
   useEffect(() => {
     let peopleLoaded = false;

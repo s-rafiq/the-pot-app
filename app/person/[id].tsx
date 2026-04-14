@@ -1,6 +1,13 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { usePot } from "../../context/PotContext";
@@ -8,7 +15,13 @@ import { formatTransactionDate } from "../../utils/date";
 
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { people, transactions, previousDebtEntries } = usePot();
+  const {
+    people,
+    transactions,
+    previousDebtEntries,
+    deleteTransaction,
+    deletePreviousDebtEntry,
+  } = usePot();
 
   const person = people.find((p) => p.id === id);
 
@@ -26,7 +39,7 @@ export default function PersonScreen() {
       personTransactions.reduce((total, t) => {
         if (t.type === "take") return total + t.amount;
         return total - t.amount;
-      }, 0)
+      }, 0),
     );
   }, [personTransactions]);
 
@@ -36,11 +49,55 @@ export default function PersonScreen() {
       personPreviousDebtEntries.reduce((total, entry) => {
         if (entry.type === "debt") return total + entry.amount;
         return total - entry.amount;
-      }, 0)
+      }, 0),
     );
   }, [personPreviousDebtEntries]);
 
   const totalOwedOverall = currentOwed + previousOwed;
+
+  const handleDeleteTransaction = (transactionId: string) => {
+    Alert.alert(
+      "Delete transaction",
+      "Are you sure you want to delete this transaction?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteTransaction(transactionId);
+            } catch (error) {
+              console.error("Failed to delete transaction:", error);
+              Alert.alert("Error", "Could not delete transaction.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeletePreviousDebtEntry = (entryId: string) => {
+    Alert.alert(
+      "Delete previous debt entry",
+      "Are you sure you want to delete this previous debt entry?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePreviousDebtEntry(entryId);
+            } catch (error) {
+              console.error("Failed to delete previous debt entry:", error);
+              Alert.alert("Error", "Could not delete previous debt entry.");
+            }
+          },
+        },
+      ],
+    );
+  };
 
   if (!person) {
     return (
@@ -96,17 +153,35 @@ export default function PersonScreen() {
                   ) : null}
                 </View>
 
-                <Text
-                  style={[
-                    styles.amountText,
-                    transaction.type === "take"
-                      ? styles.takeAmount
-                      : styles.repayAmount,
-                  ]}
-                >
-                  {transaction.type === "take" ? "-" : "+"}£
-                  {transaction.amount.toFixed(2)}
-                </Text>
+                <View style={styles.rightActions}>
+                  <Text
+                    style={[
+                      styles.amountText,
+                      transaction.type === "take"
+                        ? styles.takeAmount
+                        : styles.repayAmount,
+                    ]}
+                  >
+                    {transaction.type === "take" ? "-" : "+"}£
+                    {transaction.amount.toFixed(2)}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(`/edit-transaction/${transaction.id}`)
+                    }
+                    style={styles.deleteButton}
+                  >
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleDeleteTransaction(transaction.id)}
+                    style={styles.deleteButton}
+                  >
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -136,17 +211,35 @@ export default function PersonScreen() {
                   ) : null}
                 </View>
 
-                <Text
-                  style={[
-                    styles.amountText,
-                    entry.type === "debt"
-                      ? styles.takeAmount
-                      : styles.repayAmount,
-                  ]}
-                >
-                  {entry.type === "debt" ? "+" : "-"}£
-                  {entry.amount.toFixed(2)}
-                </Text>
+                <View style={styles.rightActions}>
+                  <Text
+                    style={[
+                      styles.amountText,
+                      entry.type === "debt"
+                        ? styles.takeAmount
+                        : styles.repayAmount,
+                    ]}
+                  >
+                    {entry.type === "debt" ? "+" : "-"}£
+                    {entry.amount.toFixed(2)}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(`/edit-previous-debt/${entry.id}`)
+                    }
+                    style={styles.deleteButton}
+                  >
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleDeletePreviousDebtEntry(entry.id)}
+                    style={styles.deleteButton}
+                  >
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -225,5 +318,24 @@ const styles = StyleSheet.create({
   },
   repayAmount: {
     color: "#067647",
+  },
+  rightActions: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+
+  deleteButton: {
+    paddingVertical: 4,
+  },
+
+  deleteButtonText: {
+    color: "#b42318",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  editButtonText: {
+    color: "#111",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

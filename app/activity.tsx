@@ -1,19 +1,48 @@
+import { router } from "expo-router";
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { usePot } from "../context/PotContext";
 import { formatTransactionDate } from "../utils/date";
 
 export default function ActivityScreen() {
-  const { transactions, isLoading } = usePot();
+  const { transactions, isLoading, deleteTransaction } = usePot();
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort(
       (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [transactions]);
+
+  const handleDeleteTransaction = (transactionId: string) => {
+    Alert.alert(
+      "Delete transaction",
+      "Are you sure you want to delete this transaction?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteTransaction(transactionId);
+            } catch (error) {
+              console.error("Failed to delete transaction:", error);
+              Alert.alert("Error", "Could not delete transaction.");
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,17 +74,35 @@ export default function ActivityScreen() {
                   ) : null}
                 </View>
 
-                <Text
-                  style={[
-                    styles.amount,
-                    transaction.type === "take"
-                      ? styles.takeAmount
-                      : styles.repayAmount,
-                  ]}
-                >
-                  {transaction.type === "take" ? "-" : "+"}£
-                  {transaction.amount.toFixed(2)}
-                </Text>
+                <View style={styles.rightActions}>
+                  <Text
+                    style={[
+                      styles.amount,
+                      transaction.type === "take"
+                        ? styles.takeAmount
+                        : styles.repayAmount,
+                    ]}
+                  >
+                    {transaction.type === "take" ? "-" : "+"}£
+                    {transaction.amount.toFixed(2)}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(`/edit-transaction/${transaction.id}`)
+                    }
+                    style={styles.actionButton}
+                  >
+                    <Text style={styles.editText}>Edit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleDeleteTransaction(transaction.id)}
+                    style={styles.actionButton}
+                  >
+                    <Text style={styles.deleteText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -124,5 +171,25 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: "#666",
+  },
+  rightActions: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+
+  actionButton: {
+    paddingVertical: 4,
+  },
+
+  editText: {
+    color: "#111",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
+  deleteText: {
+    color: "#b42318",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

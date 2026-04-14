@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,7 +24,6 @@ export default function HomeScreen() {
     transactions,
     isLoading,
     people,
-    deleteTransaction,
     fundingEvents,
     fundingEventDeductions,
   } = usePot();
@@ -42,28 +40,6 @@ export default function HomeScreen() {
     const { net } = getFundingEventTotals(event, fundingEventDeductions);
     return sum + net;
   }, 0);
-
-  const handleDeleteTransaction = (transactionId: string) => {
-    Alert.alert(
-      "Delete transaction",
-      "Are you sure you want to delete this transaction?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteTransaction(transactionId);
-            } catch (error) {
-              console.error("Failed to delete transaction:", error);
-              Alert.alert("Error", "Could not delete transaction.");
-            }
-          },
-        },
-      ],
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -94,17 +70,8 @@ export default function HomeScreen() {
 
         <View style={styles.buttonRow}>
           <ActionButton
-            label="Take"
-            onPress={() =>
-              router.push({ pathname: "/add", params: { type: "take" } })
-            }
-          />
-          <ActionButton
-            label="Repay"
-            onPress={() =>
-              router.push({ pathname: "/add", params: { type: "repay" } })
-            }
-            variant="secondary"
+            label="Add Transaction"
+            onPress={() => router.push("/add")}
           />
         </View>
 
@@ -202,11 +169,7 @@ export default function HomeScreen() {
             <Text style={styles.emptyText}>No transactions yet.</Text>
           ) : (
             recentTransactions.map((transaction) => (
-              <TouchableOpacity
-                key={transaction.id}
-                style={styles.transactionRow}
-                onPress={() => handleDeleteTransaction(transaction.id)}
-              >
+              <View key={transaction.id} style={styles.transactionRow}>
                 <View style={styles.transactionLeft}>
                   <Text style={styles.transactionTitle}>
                     {transaction.personName}{" "}
@@ -235,7 +198,7 @@ export default function HomeScreen() {
                   {transaction.type === "take" ? "-" : "+"}£
                   {transaction.amount.toFixed(2)}
                 </Text>
-              </TouchableOpacity>
+              </View>
             ))
           )}
         </View>
