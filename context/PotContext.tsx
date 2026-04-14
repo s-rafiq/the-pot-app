@@ -4,6 +4,7 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
+  updateDoc,
 } from "firebase/firestore";
 import {
   createContext,
@@ -47,6 +48,8 @@ type PotContextValue = {
     note?: string;
   }) => Promise<void>;
   addPerson: (name: string) => Promise<void>;
+  updatePerson: (personId: string, name: string) => Promise<void>;
+  deletePerson: (personId: string) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
   addPreviousDebtEntry: (input: {
     person: Person;
@@ -109,6 +112,20 @@ export function PotProvider({ children }: { children: ReactNode }) {
     await addDoc(collection(db, "people"), {
       name: trimmedName,
     });
+  };
+
+  const updatePerson = async (personId: string, name: string) => {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) return;
+
+    await updateDoc(doc(db, "people", personId), {
+      name: trimmedName,
+    });
+  };
+
+  const deletePerson = async (personId: string) => {
+    await deleteDoc(doc(db, "people", personId));
   };
 
   const deleteTransaction = async (transactionId: string) => {
@@ -199,6 +216,8 @@ export function PotProvider({ children }: { children: ReactNode }) {
       addPerson,
       deleteTransaction,
       addPreviousDebtEntry,
+      updatePerson,
+      deletePerson,
       addFundingEvent,
     }),
     [

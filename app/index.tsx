@@ -1,12 +1,11 @@
+import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -26,32 +25,16 @@ export default function HomeScreen() {
     transactions,
     isLoading,
     people,
-    addPerson,
     deleteTransaction,
     fundingEvents,
     fundingEventDeductions,
   } = usePot();
 
-  const handleAddPerson = async () => {
-    const trimmed = newPersonName.trim();
-
-    if (!trimmed) {
-      Alert.alert("Invalid name", "Please enter a name.");
-      return;
-    }
-
-    try {
-      await addPerson(trimmed);
-      setNewPersonName("");
-      setIsModalVisible(false);
-    } catch (error) {
-      console.error("Failed to add person:", error);
-    }
-  };
-
   const personBalances = useMemo(() => {
     return getPersonBalances(people, transactions);
   }, [people, transactions]);
+
+  const recentTransactions = transactions.slice(0, 4);
 
   const grandTotalOwed = owed + previousOwed;
 
@@ -59,9 +42,6 @@ export default function HomeScreen() {
     const { net } = getFundingEventTotals(event, fundingEventDeductions);
     return sum + net;
   }, 0);
-
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [newPersonName, setNewPersonName] = useState("");
 
   const handleDeleteTransaction = (transactionId: string) => {
     Alert.alert(
@@ -134,14 +114,15 @@ export default function HomeScreen() {
           variant="secondary"
         />
 
-        <ActionButton
-          label="Funding Events"
-          onPress={() => router.push("/funding-event")}
-          variant="secondary"
-        />
-
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>People</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>People</Text>
+
+            <TouchableOpacity onPress={() => router.push("/people")}>
+              <Feather name="more-horizontal" size={20} color="#111" />
+            </TouchableOpacity>
+          </View>
+
           {people.length === 0 ? (
             <Text style={styles.emptyText}>No people yet.</Text>
           ) : (
@@ -162,15 +143,16 @@ export default function HomeScreen() {
               );
             })
           )}
-          <ActionButton
-            label="+ Add Person"
-            onPress={() => setIsModalVisible(true)}
-            variant="secondary"
-          />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Funding Events</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Funding Events</Text>
+
+            <TouchableOpacity onPress={() => router.push("/funding")}>
+              <Feather name="more-horizontal" size={20} color="#111" />
+            </TouchableOpacity>
+          </View>
 
           {fundingEvents.length === 0 ? (
             <Text style={styles.emptyText}>No funding events yet.</Text>
@@ -178,7 +160,7 @@ export default function HomeScreen() {
             fundingEvents.map((event) => {
               const { deductions, net } = getFundingEventTotals(
                 event,
-                fundingEventDeductions
+                fundingEventDeductions,
               );
 
               return (
@@ -206,14 +188,20 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+
+            <TouchableOpacity onPress={() => router.push("/activity")}>
+              <Text style={styles.seeAllText}>See all</Text>
+            </TouchableOpacity>
+          </View>
 
           {isLoading ? (
             <Text style={styles.emptyText}>Loading transactions...</Text>
           ) : transactions.length === 0 ? (
             <Text style={styles.emptyText}>No transactions yet.</Text>
           ) : (
-            transactions.map((transaction) => (
+            recentTransactions.map((transaction) => (
               <TouchableOpacity
                 key={transaction.id}
                 style={styles.transactionRow}
@@ -252,40 +240,6 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
-
-      <Modal visible={isModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Person</Text>
-
-            <TextInput
-              value={newPersonName}
-              onChangeText={setNewPersonName}
-              placeholder="Enter name"
-              style={styles.input}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => {
-                  setIsModalVisible(false);
-                  setNewPersonName("");
-                }}
-              >
-                <Text>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSave}
-                onPress={handleAddPerson}
-              >
-                <Text style={{ color: "#fff" }}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -311,10 +265,15 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 16,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 12,
   },
   buttonRow: {
     flexDirection: "row",
@@ -377,46 +336,9 @@ const styles = StyleSheet.create({
   repayAmount: {
     color: "#067647",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
+  seeAllText: {
+    fontSize: 14,
     fontWeight: "600",
-    marginBottom: 12,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 12,
-    marginTop: 16,
-  },
-  modalCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  modalSave: {
-    backgroundColor: "#111",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d8dce6",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    color: "#111",
   },
 });

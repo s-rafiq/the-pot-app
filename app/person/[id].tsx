@@ -2,9 +2,9 @@ import { useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { formatTransactionDate } from "../../utils/date";
 
 import { usePot } from "../../context/PotContext";
+import { formatTransactionDate } from "../../utils/date";
 
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +26,7 @@ export default function PersonScreen() {
       personTransactions.reduce((total, t) => {
         if (t.type === "take") return total + t.amount;
         return total - t.amount;
-      }, 0),
+      }, 0)
     );
   }, [personTransactions]);
 
@@ -36,7 +36,7 @@ export default function PersonScreen() {
       personPreviousDebtEntries.reduce((total, entry) => {
         if (entry.type === "debt") return total + entry.amount;
         return total - entry.amount;
-      }, 0),
+      }, 0)
     );
   }, [personPreviousDebtEntries]);
 
@@ -86,16 +86,23 @@ export default function PersonScreen() {
                       ? "Took from pot"
                       : "Repaid pot"}
                   </Text>
+
                   <Text style={styles.date}>
                     {formatTransactionDate(transaction.createdAt)}
                   </Text>
+
+                  {transaction.note ? (
+                    <Text style={styles.note}>{transaction.note}</Text>
+                  ) : null}
                 </View>
 
                 <Text
-                  style={{
-                    fontWeight: "700",
-                    color: transaction.type === "take" ? "#b42318" : "#067647",
-                  }}
+                  style={[
+                    styles.amountText,
+                    transaction.type === "take"
+                      ? styles.takeAmount
+                      : styles.repayAmount,
+                  ]}
                 >
                   {transaction.type === "take" ? "-" : "+"}£
                   {transaction.amount.toFixed(2)}
@@ -119,21 +126,26 @@ export default function PersonScreen() {
                       ? "Added previous debt"
                       : "Repaid previous debt"}
                   </Text>
+
                   <Text style={styles.date}>
                     {formatTransactionDate(entry.createdAt)}
                   </Text>
+
                   {entry.note ? (
-                    <Text style={styles.date}>{entry.note}</Text>
+                    <Text style={styles.note}>{entry.note}</Text>
                   ) : null}
                 </View>
 
                 <Text
-                  style={{
-                    fontWeight: "700",
-                    color: entry.type === "debt" ? "#b42318" : "#067647",
-                  }}
+                  style={[
+                    styles.amountText,
+                    entry.type === "debt"
+                      ? styles.takeAmount
+                      : styles.repayAmount,
+                  ]}
                 >
-                  {entry.type === "debt" ? "+" : "-"}£{entry.amount.toFixed(2)}
+                  {entry.type === "debt" ? "+" : "-"}£
+                  {entry.amount.toFixed(2)}
                 </Text>
               </View>
             ))
@@ -171,13 +183,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: "#eee",
+    gap: 12,
   },
   date: {
     fontSize: 12,
     color: "#666",
+    marginTop: 4,
+  },
+  note: {
+    fontSize: 14,
+    color: "#444",
+    marginTop: 6,
   },
   emptyText: {
     color: "#666",
@@ -196,5 +216,14 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 22,
     fontWeight: "700",
+  },
+  amountText: {
+    fontWeight: "700",
+  },
+  takeAmount: {
+    color: "#b42318",
+  },
+  repayAmount: {
+    color: "#067647",
   },
 });
