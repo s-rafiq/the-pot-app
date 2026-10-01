@@ -5,6 +5,7 @@ import {
   doc,
   onSnapshot,
   updateDoc,
+  setDoc,
 } from "firebase/firestore";
 import {
   createContext,
@@ -14,6 +15,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "../lib/firebase";
 import type {
   FundingEvent,
@@ -41,11 +43,16 @@ type PotContextValue = {
   fundingEvents: FundingEvent[];
   fundingEventDeductions: FundingEventDeduction[];
   isLoading: boolean;
+  potName: string;
+  myPersonId: string | null;
+  setMyPersonId: (id: string | null) => Promise<void>;
+  updatePotSettings: (settings: { potName?: string }) => Promise<void>;
   addTransaction: (input: {
     person: Person;
     type: TransactionType;
     amount: number;
     note?: string;
+    date?: string;
   }) => Promise<void>;
   addPerson: (name: string) => Promise<void>;
   updatePerson: (personId: string, name: string) => Promise<void>;
@@ -100,8 +107,6 @@ type PotContextValue = {
   deleteFundingEvent: (eventId: string) => Promise<void>;
 };
 
-const STARTING_BALANCE = 240;
-
 const PotContext = createContext<PotContextValue | undefined>(undefined);
 
 export function PotProvider({ children }: { children: ReactNode }) {
@@ -115,19 +120,38 @@ export function PotProvider({ children }: { children: ReactNode }) {
     FundingEventDeduction[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [potName, setPotName] = useState("The Pot");
+  const [myPersonId, setMyPersonIdState] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem("myPersonId").then((id) => {
+      if (id) setMyPersonIdState(id);
+    });
+  }, []);
+
+  const setMyPersonId = async (id: string | null) => {
+    setMyPersonIdState(id);
+    if (id) {
+      await AsyncStorage.setItem("myPersonId", id);
+    } else {
+      await AsyncStorage.removeItem("myPersonId");
+    }
+  };
 
   const addTransaction = async ({
     person,
     type,
     amount,
     note,
+    date,
   }: {
     person: Person;
     type: TransactionType;
     amount: number;
     note?: string;
+    date?: string;
   }) => {
-    const createdAt = new Date().toISOString();
+    const createdAt = date || new Date().toISOString();
 
     await addDoc(collection(db, "transactions"), {
       personId: person.id,
@@ -137,6 +161,10 @@ export function PotProvider({ children }: { children: ReactNode }) {
       note: note?.trim() ? note.trim() : null,
       createdAt,
     });
+  };
+
+  const updatePotSettings = async (settings: { potName?: string }) => {
+    await setDoc(doc(db, "potSettings", "main"), settings, { merge: true });
   };
 
   const addPerson = async (name: string) => {
@@ -331,7 +359,7 @@ export function PotProvider({ children }: { children: ReactNode }) {
   }, [fundingEvents, fundingEventDeductions]);
 
   const balance = useMemo(() => {
-    return getCurrentBalance(STARTING_BALANCE + totalFunding, transactions);
+    return getCurrentBalance(totalFunding, transactions);
   }, [transactions, totalFunding]);
 
   const owed = useMemo(() => {
@@ -352,6 +380,10 @@ export function PotProvider({ children }: { children: ReactNode }) {
     fundingEvents,
     fundingEventDeductions,
     isLoading,
+    potName,
+    myPersonId,
+    setMyPersonId,
+    updatePotSettings,
     addTransaction,
     addPerson,
     deleteTransaction,
@@ -372,6 +404,7 @@ export function PotProvider({ children }: { children: ReactNode }) {
     let previousDebtLoaded = false;
     let fundingLoaded = false;
     let deductionsLoaded = false;
+    let settingsLoaded = false;
 
     const updateLoadingState = () => {
       if (
@@ -379,7 +412,8 @@ export function PotProvider({ children }: { children: ReactNode }) {
         transactionsLoaded &&
         previousDebtLoaded &&
         fundingLoaded &&
-        deductionsLoaded
+        deductionsLoaded &&
+        settingsLoaded
       ) {
         setIsLoading(false);
       }
@@ -529,12 +563,30 @@ export function PotProvider({ children }: { children: ReactNode }) {
       },
     );
 
+    const unsubscribeSettings = onSnapshot(
+      doc(db, "potSettings", "main"),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setPotName(data.potName ?? "The Pot");
+        }
+        settingsLoaded = true;
+        updateLoadingState();
+      },
+      (error) => {
+        console.error("Failed to listen to settings:", error);
+        settingsLoaded = true;
+        updateLoadingState();
+      }
+    );
+
     return () => {
       unsubscribePeople();
       unsubscribeTransactions();
       unsubscribePreviousDebt();
       unsubscribeFunding();
       unsubscribeDeductions();
+      unsubscribeSettings();
     };
   }, []);
 

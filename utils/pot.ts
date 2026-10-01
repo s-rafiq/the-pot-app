@@ -23,7 +23,7 @@ export function getPersonBalances(
 
     if (transaction.type === "take") {
       totals[transaction.personId] += transaction.amount;
-    } else {
+    } else if (transaction.type === "repay") {
       totals[transaction.personId] -= transaction.amount;
     }
   }
@@ -48,7 +48,7 @@ export function getCurrentBalance(
   transactions: Transaction[],
 ) {
   return transactions.reduce((total, transaction) => {
-    if (transaction.type === "take") {
+    if (transaction.type === "take" || transaction.type === "write-off") {
       return total - transaction.amount;
     }
 

@@ -12,6 +12,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { usePot } from "../context/PotContext";
 import { formatTransactionDate } from "../utils/date";
 import { getFundingEventTotals } from "../utils/pot";
+import { theme } from "../constants/theme";
+import { formatMoney } from "../utils/money";
 
 export default function FundingScreen() {
   const { fundingEvents, fundingEventDeductions, deleteFundingEvent } =
@@ -75,15 +77,15 @@ export default function FundingScreen() {
                     ) : null}
 
                     <Text style={styles.detailText}>
-                      Gross: £{gross.toFixed(2)}
+                      Gross: £{formatMoney(gross)}
                     </Text>
                     <Text style={styles.detailText}>
-                      Deductions: £{deductions.toFixed(2)}
+                      Deductions: £{formatMoney(deductions)}
                     </Text>
                   </View>
 
                   <View style={styles.rightActions}>
-                    <Text style={styles.netAmount}>+£{net.toFixed(2)}</Text>
+                    <Text style={styles.netAmount}>+£{formatMoney(net)}</Text>
 
                     <TouchableOpacity
                       onPress={() => router.push(`/edit-funding/${event.id}`)}
@@ -114,7 +116,7 @@ export default function FundingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 20,
@@ -130,23 +132,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "700",
+      color: theme.colors.text,
   },
   plusButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#111",
+    backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   plusButtonText: {
-    color: "#fff",
+    color: theme.colors.text,
     fontSize: 22,
     fontWeight: "600",
     lineHeight: 24,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 18,
   },
@@ -155,7 +158,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     borderTopWidth: 1,
-    borderTopColor: "#eef1f5",
+    borderTopColor: theme.colors.cardBorder,
     paddingVertical: 12,
     gap: 12,
   },
@@ -166,29 +169,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 4,
+      color: theme.colors.text,
   },
   date: {
     fontSize: 13,
-    color: "#666",
+    color: theme.colors.textSecondary,
   },
   note: {
     fontSize: 14,
-    color: "#444",
+    color: theme.colors.textSecondary,
     marginTop: 6,
   },
   detailText: {
     fontSize: 14,
-    color: "#444",
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   netAmount: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#067647",
+    color: theme.colors.success,
   },
   emptyText: {
     fontSize: 15,
-    color: "#666",
+    color: theme.colors.textSecondary,
   },
   rightActions: {
     alignItems: "flex-end",
@@ -200,13 +204,13 @@ const styles = StyleSheet.create({
   },
 
   editText: {
-    color: "#111",
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: "600",
   },
 
   deleteText: {
-    color: "#b42318",
+    color: theme.colors.danger,
     fontSize: 13,
     fontWeight: "600",
   },

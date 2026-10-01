@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -7,12 +8,19 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { ActionButton } from "../components/ActionButton";
 import { usePot } from "../context/PotContext";
 import type { TransactionType } from "../types/transaction";
+import { theme } from "../constants/theme";
 
 export default function AddTransactionScreen() {
   const { addTransaction, people } = usePot();
@@ -21,12 +29,18 @@ export default function AddTransactionScreen() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [type, setType] = useState<TransactionType | "">("");
+  const [date, setDate] = useState(new Date());
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (people.length > 0 && !selectedPersonId) {
-      setSelectedPersonId(people[0].id);
-    }
-  }, [people, selectedPersonId]);
+    AsyncStorage.getItem("myPersonId").then((myId) => {
+      if (myId && people.some(p => p.id === myId)) {
+        setSelectedPersonId(myId);
+      } else if (people.length > 0 && !selectedPersonId) {
+        setSelectedPersonId(people[0].id);
+      }
+    });
+  }, [people]);
 
   const handleSave = async () => {
     const parsedAmount = Number(amount);
@@ -40,7 +54,7 @@ export default function AddTransactionScreen() {
     }
 
     if (!type) {
-      Alert.alert("No transaction type", "Please choose Take or Repay.");
+      Alert.alert("No transaction type", "Please choose Withdraw or Deposit.");
       return;
     }
 
@@ -53,24 +67,36 @@ export default function AddTransactionScreen() {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       await addTransaction({
         person: selectedPerson,
         type,
         amount: parsedAmount,
         note,
+        date: date.toISOString(),
       });
 
       router.back();
     } catch (error) {
       console.error("Failed to save transaction:", error);
       Alert.alert("Error", "Could not save transaction.");
+      setIsSubmitting(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Add Transaction</Text>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.title}>Add Transaction</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Choose Person</Text>
@@ -107,23 +133,6 @@ export default function AddTransactionScreen() {
           <TouchableOpacity
             style={[
               styles.typeChip,
-              type === "take" && styles.typeChipSelected,
-            ]}
-            onPress={() => setType("take")}
-          >
-            <Text
-              style={[
-                styles.typeChipText,
-                type === "take" && styles.typeChipTextSelected,
-              ]}
-            >
-              Take
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.typeChip,
               type === "repay" && styles.typeChipSelected,
             ]}
             onPress={() => setType("repay")}
@@ -134,21 +143,58 @@ export default function AddTransactionScreen() {
                 type === "repay" && styles.typeChipTextSelected,
               ]}
             >
-              Repay
+              Deposit
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.typeChip,
+              type === "take" && styles.typeChipSelected,
+            ]}
+            onPress={() => setType("take")}
+          >
+            <Text
+              style={[
+                styles.typeChipText,
+                type === "take" && styles.typeChipTextSelected,
+              ]}
+            >
+              Withdraw
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Amount</Text>
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="e.g. 20"
-          keyboardType="numeric"
-          style={styles.input}
-        />
+      <View style={{ flexDirection: 'row', gap: 16 }}>
+        <View style={[styles.card, { flex: 1 }]}>
+          <Text style={styles.label}>Amount</Text>
+          <View style={styles.inputPrefixContainer}>
+            <Text style={styles.inputPrefix}>£</Text>
+            <TextInput
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0.00"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="numeric"
+              style={styles.inputWithPrefix}
+            />
+          </View>
+        </View>
+
+        <View style={[styles.card, { flex: 1 }]}>
+          <Text style={styles.label}>Date</Text>
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display="default"
+            themeVariant="dark"
+            onChange={(event, selectedDate) => {
+              if (selectedDate) setDate(selectedDate);
+            }}
+            style={{ alignSelf: 'flex-start', marginTop: 4 }}
+          />
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -161,7 +207,11 @@ export default function AddTransactionScreen() {
         />
       </View>
 
-      <ActionButton label="Save Transaction" onPress={handleSave} />
+            <View style={{ flexDirection: 'row', marginTop: 'auto', paddingTop: 20 }}>
+              <ActionButton label="Confirm Transaction" onPress={handleSave} isLoading={isSubmitting} />
+            </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -169,7 +219,7 @@ export default function AddTransactionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: theme.colors.background,
     padding: 20,
   },
   title: {
@@ -177,9 +227,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 12,
     marginBottom: 20,
+      color: theme.colors.text,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
@@ -188,6 +239,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
+      color: theme.colors.text,
   },
   peopleRow: {
     flexDirection: "row",
@@ -195,21 +247,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   personChip: {
-    backgroundColor: "#eef1f5",
+    backgroundColor: theme.colors.cardBorder,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
   },
   personChipSelected: {
-    backgroundColor: "#111",
+    backgroundColor: theme.colors.primary,
   },
   personChipText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#111",
+    color: theme.colors.text,
   },
   personChipTextSelected: {
-    color: "#fff",
+    color: theme.colors.text,
   },
   typeRow: {
     flexDirection: "row",
@@ -217,29 +269,50 @@ const styles = StyleSheet.create({
   },
   typeChip: {
     flex: 1,
-    backgroundColor: "#eef1f5",
+    backgroundColor: theme.colors.cardBorder,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
   },
   typeChipSelected: {
-    backgroundColor: "#111",
+    backgroundColor: theme.colors.primary,
   },
   typeChipText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111",
+    color: theme.colors.text,
   },
   typeChipTextSelected: {
-    color: "#fff",
+    color: theme.colors.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d8dce6",
+    borderColor: theme.colors.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
+    color: theme.colors.text,
+  },
+  inputPrefixContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+    borderRadius: 12,
+    backgroundColor: theme.colors.card,
+    paddingHorizontal: 14,
+  },
+  inputPrefix: {
+    fontSize: 16,
+    color: theme.colors.text,
+    marginRight: 4,
+  },
+  inputWithPrefix: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: theme.colors.text,
   },
 });

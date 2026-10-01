@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ActionButton } from "../../components/ActionButton";
 import { usePot } from "../../context/PotContext";
+import { theme } from "../../constants/theme";
+import { formatMoney } from "../../utils/money";
 
 type DeductionDraft = {
   id?: string;
@@ -37,6 +39,7 @@ export default function EditFundingScreen() {
   const [grossAmount, setGrossAmount] = useState("");
   const [note, setNote] = useState("");
   const [deductions, setDeductions] = useState<DeductionDraft[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -140,6 +143,8 @@ export default function EditFundingScreen() {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       await updateFundingEvent(event.id, {
         title: title.trim(),
@@ -152,6 +157,7 @@ export default function EditFundingScreen() {
     } catch (error) {
       console.error("Failed to update funding event:", error);
       Alert.alert("Error", "Could not update funding event.");
+      setIsSubmitting(false);
     }
   };
 
@@ -240,14 +246,14 @@ export default function EditFundingScreen() {
 
         <View style={styles.card}>
           <Text style={styles.summaryLine}>
-            Total deductions: £{totalDeductions.toFixed(2)}
+            Total deductions: £{formatMoney(totalDeductions)}
           </Text>
           <Text style={styles.summaryLine}>
-            Net received: £{netAmount.toFixed(2)}
+            Net received: £{formatMoney(netAmount)}
           </Text>
         </View>
 
-        <ActionButton label="Save Changes" onPress={handleSave} />
+        <ActionButton label="Save Changes" onPress={handleSave} isLoading={isSubmitting} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -256,7 +262,7 @@ export default function EditFundingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 20,
@@ -267,9 +273,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 12,
     marginBottom: 20,
+      color: theme.colors.text,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
@@ -278,16 +285,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
+      color: theme.colors.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d8dce6",
+    borderColor: theme.colors.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     marginBottom: 12,
+      color: theme.colors.text,
   },
   deductionBlock: {
     marginBottom: 8,
@@ -298,19 +307,20 @@ const styles = StyleSheet.create({
   addRowButtonText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111",
+    color: theme.colors.text,
   },
   removeButton: {
     alignSelf: "flex-start",
     paddingVertical: 6,
   },
   removeButtonText: {
-    color: "#b42318",
+    color: theme.colors.danger,
     fontWeight: "600",
   },
   summaryLine: {
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 6,
+      color: theme.colors.text,
   },
 });

@@ -1,4 +1,4 @@
-export type TransactionType = "take" | "repay";
+export type TransactionType = "take" | "repay" | "write-off";
 
 export type Person = {
   id: string;

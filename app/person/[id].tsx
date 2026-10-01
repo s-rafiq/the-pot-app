@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -12,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { usePot } from "../../context/PotContext";
 import { formatTransactionDate } from "../../utils/date";
+import { theme } from "../../constants/theme";
+import { formatMoney } from "../../utils/money";
 
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,9 +24,25 @@ export default function PersonScreen() {
     previousDebtEntries,
     deleteTransaction,
     deletePreviousDebtEntry,
+    myPersonId,
+    setMyPersonId,
   } = usePot();
 
   const person = people.find((p) => p.id === id);
+
+  const isMe = myPersonId === id;
+
+  const handleSetMe = async () => {
+    if (isMe) {
+      await setMyPersonId(null);
+      Alert.alert("Unlinked", "You are no longer linked to this profile.");
+    } else {
+      if (typeof id === 'string') {
+        await setMyPersonId(id);
+        Alert.alert("Linked", "You are now linked to this profile.");
+      }
+    }
+  };
 
   const personTransactions = useMemo(() => {
     return transactions.filter((t) => t.personId === id);
@@ -110,22 +129,29 @@ export default function PersonScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.name}>{person.name}</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.name}>{person.name}</Text>
+          <TouchableOpacity onPress={handleSetMe} style={styles.thisIsMeButton}>
+            <Text style={styles.thisIsMeText}>{isMe ? "★ This is me" : "Set as me"}</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Current Owed</Text>
-          <Text style={styles.summaryValue}>£{currentOwed.toFixed(2)}</Text>
+          <Text style={styles.summaryValue}>£{formatMoney(currentOwed)}</Text>
         </View>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Previously Owed</Text>
-          <Text style={styles.summaryValue}>£{previousOwed.toFixed(2)}</Text>
-        </View>
+        {previousOwed > 0 && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Previously Owed</Text>
+            <Text style={styles.summaryValue}>£{formatMoney(previousOwed)}</Text>
+          </View>
+        )}
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total Owed Overall</Text>
           <Text style={styles.summaryValue}>
-            £{totalOwedOverall.toFixed(2)}
+            £{formatMoney(totalOwedOverall)}
           </Text>
         </View>
 
@@ -140,8 +166,8 @@ export default function PersonScreen() {
                 <View style={{ flex: 1 }}>
                   <Text>
                     {transaction.type === "take"
-                      ? "Took from pot"
-                      : "Repaid pot"}
+                      ? "Withdrew from pot"
+                      : "Deposited to pot"}
                   </Text>
 
                   <Text style={styles.date}>
@@ -163,7 +189,7 @@ export default function PersonScreen() {
                     ]}
                   >
                     {transaction.type === "take" ? "-" : "+"}£
-                    {transaction.amount.toFixed(2)}
+                    {formatMoney(transaction.amount)}
                   </Text>
 
                   <TouchableOpacity
@@ -221,7 +247,7 @@ export default function PersonScreen() {
                     ]}
                   >
                     {entry.type === "debt" ? "+" : "-"}£
-                    {entry.amount.toFixed(2)}
+                    {formatMoney(entry.amount)}
                   </Text>
 
                   <TouchableOpacity
@@ -252,18 +278,35 @@ export default function PersonScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 20,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   name: {
     fontSize: 28,
     fontWeight: "700",
-    marginBottom: 8,
+      color: theme.colors.text,
+  },
+  thisIsMeButton: {
+    backgroundColor: theme.colors.cardBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  thisIsMeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -272,6 +315,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 12,
+      color: theme.colors.text,
   },
   row: {
     flexDirection: "row",
@@ -279,45 +323,47 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: theme.colors.cardBorder,
     gap: 12,
   },
   date: {
     fontSize: 12,
-    color: "#666",
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   note: {
     fontSize: 14,
-    color: "#444",
+    color: theme.colors.textSecondary,
     marginTop: 6,
   },
   emptyText: {
-    color: "#666",
+    color: theme.colors.textSecondary,
   },
   summaryCard: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
   },
   summaryLabel: {
     fontSize: 14,
-    color: "#666",
+    color: theme.colors.textSecondary,
     marginBottom: 6,
   },
   summaryValue: {
     fontSize: 22,
     fontWeight: "700",
+      color: theme.colors.text,
   },
   amountText: {
     fontWeight: "700",
+      color: theme.colors.text,
   },
   takeAmount: {
-    color: "#b42318",
+    color: theme.colors.danger,
   },
   repayAmount: {
-    color: "#067647",
+    color: theme.colors.success,
   },
   rightActions: {
     alignItems: "flex-end",
@@ -329,12 +375,12 @@ const styles = StyleSheet.create({
   },
 
   deleteButtonText: {
-    color: "#b42318",
+    color: theme.colors.danger,
     fontSize: 13,
     fontWeight: "600",
   },
   editButtonText: {
-    color: "#111",
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: "600",
   },

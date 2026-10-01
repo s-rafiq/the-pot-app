@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ActionButton } from "../../components/ActionButton";
 import { usePot } from "../../context/PotContext";
 import type { TransactionType } from "../../types/transaction";
+import { theme } from "../../constants/theme";
 
 export default function EditTransactionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,6 +28,7 @@ export default function EditTransactionScreen() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [type, setType] = useState<TransactionType | "">("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (transaction) {
@@ -65,6 +67,8 @@ export default function EditTransactionScreen() {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       await updateTransaction(transaction.id, {
         personId: selectedPerson.id,
@@ -78,6 +82,7 @@ export default function EditTransactionScreen() {
     } catch (error) {
       console.error("Failed to update transaction:", error);
       Alert.alert("Error", "Could not update transaction.");
+      setIsSubmitting(false);
     }
   };
 
@@ -185,7 +190,7 @@ export default function EditTransactionScreen() {
           />
         </View>
 
-        <ActionButton label="Save Changes" onPress={handleSave} />
+        <ActionButton label="Save Changes" onPress={handleSave} isLoading={isSubmitting} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -194,7 +199,7 @@ export default function EditTransactionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 20,
@@ -205,9 +210,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 12,
     marginBottom: 20,
+      color: theme.colors.text,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
@@ -216,6 +222,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
+      color: theme.colors.text,
   },
   peopleRow: {
     flexDirection: "row",
@@ -223,21 +230,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   personChip: {
-    backgroundColor: "#eef1f5",
+    backgroundColor: theme.colors.cardBorder,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
   },
   personChipSelected: {
-    backgroundColor: "#111",
+    backgroundColor: theme.colors.primary,
   },
   personChipText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#111",
+    color: theme.colors.text,
   },
   personChipTextSelected: {
-    color: "#fff",
+    color: theme.colors.text,
   },
   typeRow: {
     flexDirection: "row",
@@ -245,29 +252,30 @@ const styles = StyleSheet.create({
   },
   typeChip: {
     flex: 1,
-    backgroundColor: "#eef1f5",
+    backgroundColor: theme.colors.cardBorder,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
   },
   typeChipSelected: {
-    backgroundColor: "#111",
+    backgroundColor: theme.colors.primary,
   },
   typeChipText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111",
+    color: theme.colors.text,
   },
   typeChipTextSelected: {
-    color: "#fff",
+    color: theme.colors.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d8dce6",
+    borderColor: theme.colors.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
+      color: theme.colors.text,
   },
 });

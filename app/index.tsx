@@ -1,20 +1,26 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { theme } from "../constants/theme";
+
 import { ActionButton } from "../components/ActionButton";
 import { SummaryCard } from "../components/SummaryCard";
+import { WidgetGrid } from "../components/widget/WidgetGrid";
 import { usePot } from "../context/PotContext";
 import { formatTransactionDate } from "../utils/date";
-import { getFundingEventTotals, getPersonBalances } from "../utils/pot";
+import { getFundingEventTotals, getPersonBalances, getPreviousDebtBalances } from "../utils/pot";
+import { formatMoney } from "../utils/money";
 
 export default function HomeScreen() {
   const {
@@ -22,71 +28,90 @@ export default function HomeScreen() {
     owed,
     previousOwed,
     transactions,
+    previousDebtEntries,
     isLoading,
     people,
     fundingEvents,
     fundingEventDeductions,
+    potName,
+    myPersonId,
+    updatePotSettings,
   } = usePot();
+
+  const [isEditSettingsModalVisible, setIsEditSettingsModalVisible] = useState(false);
+  const [newPotName, setNewPotName] = useState("");
 
   const personBalances = useMemo(() => {
     return getPersonBalances(people, transactions);
   }, [people, transactions]);
 
-  const recentTransactions = transactions.slice(0, 4);
+  const previousBalances = useMemo(() => {
+    return getPreviousDebtBalances(people, previousDebtEntries);
+  }, [people, previousDebtEntries]);
+
+  const recentTransactions = transactions.filter((t) => t.type !== "write-off").slice(0, 4);
 
   const grandTotalOwed = owed + previousOwed;
 
-  const totalFundingNet = fundingEvents.reduce((sum, event) => {
-    const { net } = getFundingEventTotals(event, fundingEventDeductions);
-    return sum + net;
-  }, 0);
+  const myPersonBalance = myPersonId ? (personBalances[myPersonId] ?? 0) : null;
+
+  const handleSaveSettings = async () => {
+    if (!newPotName.trim()) {
+      return;
+    }
+    try {
+      await updatePotSettings({
+        potName: newPotName.trim()
+      });
+      setIsEditSettingsModalVisible(false);
+    } catch (error) {
+      console.error("Failed to update settings", error);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.appTitle}>The Pot</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.appTitle}>{potName}</Text>
+          <TouchableOpacity onPress={() => {
+            setNewPotName(potName);
+            setIsEditSettingsModalVisible(true);
+          }}>
+            <Feather name="settings" size={24} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
-        <SummaryCard
-          label="Current Pot Balance"
-          value={`£${balance.toFixed(2)}`}
-        />
-
-        <SummaryCard label="Current Pot Owed" value={`£${owed.toFixed(2)}`} />
-
-        <SummaryCard
-          label="Previously Owed"
-          value={`£${previousOwed.toFixed(2)}`}
-        />
-
-        <SummaryCard
-          label="Grand Total Owed"
-          value={`£${grandTotalOwed.toFixed(2)}`}
-        />
-
-        <SummaryCard
-          label="Total Net Funding"
-          value={`£${totalFundingNet.toFixed(2)}`}
+        <WidgetGrid 
+          balance={balance} 
+          owed={owed} 
+          grandTotalOwed={grandTotalOwed}
+          myPersonBalance={myPersonBalance}
         />
 
         <View style={styles.buttonRow}>
           <ActionButton
-            label="Add Transaction"
+            label="Deposit / Withdraw"
             onPress={() => router.push("/add")}
           />
         </View>
 
-        <ActionButton
-          label="Previously Owed"
-          onPress={() => router.push("/previous-debt")}
-          variant="secondary"
-        />
+        <View style={[styles.buttonRow, { marginTop: -10 }]}>
+          <ActionButton
+            label="Write-off"
+            variant="secondary"
+            onPress={() => router.push("/write-off")}
+          />
+        </View>
 
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>People</Text>
+            <View>
+              <Text style={styles.sectionTitle}>People</Text>
+            </View>
 
             <TouchableOpacity onPress={() => router.push("/people")}>
-              <Feather name="more-horizontal" size={20} color="#111" />
+              <Feather name="more-horizontal" size={24} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -104,7 +129,7 @@ export default function HomeScreen() {
                 >
                   <Text style={styles.personName}>{person.name}</Text>
                   <Text style={styles.personBalance}>
-                    £{personBalance.toFixed(2)}
+                    £{formatMoney(personBalance)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -117,7 +142,7 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Funding Events</Text>
 
             <TouchableOpacity onPress={() => router.push("/funding")}>
-              <Feather name="more-horizontal" size={20} color="#111" />
+              <Feather name="more-horizontal" size={24} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -141,12 +166,12 @@ export default function HomeScreen() {
                       <Text style={styles.transactionNote}>{event.note}</Text>
                     ) : null}
                     <Text style={styles.transactionNote}>
-                      Deductions: £{deductions.toFixed(2)}
+                      Deductions: £{formatMoney(deductions)}
                     </Text>
                   </View>
 
                   <Text style={[styles.transactionAmount, styles.repayAmount]}>
-                    +£{net.toFixed(2)}
+                    +£{formatMoney(net)}
                   </Text>
                 </View>
               );
@@ -169,13 +194,13 @@ export default function HomeScreen() {
             <Text style={styles.emptyText}>No transactions yet.</Text>
           ) : (
             recentTransactions.map((transaction) => (
-              <View key={transaction.id} style={styles.transactionRow}>
+              <TouchableOpacity key={transaction.id} style={styles.transactionRow} onPress={() => router.push("/activity")}>
                 <View style={styles.transactionLeft}>
                   <Text style={styles.transactionTitle}>
-                    {transaction.personName}{" "}
+                    {people.find(p => p.id === transaction.personId)?.name || transaction.personName}{" "}
                     {transaction.type === "take"
-                      ? "took from pot"
-                      : "repaid pot"}
+                      ? "withdrew from pot"
+                      : "deposited to pot"}
                   </Text>
                   <Text style={styles.transactionDate}>
                     {formatTransactionDate(transaction.createdAt)}
@@ -196,13 +221,44 @@ export default function HomeScreen() {
                   ]}
                 >
                   {transaction.type === "take" ? "-" : "+"}£
-                  {transaction.amount.toFixed(2)}
+                  {formatMoney(transaction.amount)}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
       </ScrollView>
+
+      <Modal visible={isEditSettingsModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Pot Settings</Text>
+            
+            <Text style={styles.label}>Pot Name</Text>
+            <TextInput
+              value={newPotName}
+              onChangeText={setNewPotName}
+              placeholder="e.g. Rafiq Household"
+              style={styles.input}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setIsEditSettingsModalVisible(false)}
+              >
+                <Text>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSave}
+                onPress={handleSaveSettings}
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -210,33 +266,75 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: theme.colors.background,
   },
   content: {
-    padding: 20,
-    paddingBottom: 32,
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   appTitle: {
-    fontSize: 32,
-    fontWeight: "700",
-    marginTop: 12,
-    marginBottom: 20,
+    fontSize: 34,
+    fontWeight: "800",
+    color: theme.colors.text,
+    letterSpacing: -0.5,
   },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+    ...theme.shadows.card,
   },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    alignItems: "flex-start",
+    marginBottom: theme.spacing.md,
+  },
+  topSummaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfCard: {
+    flex: 1,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    marginTop: theme.spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: theme.borderRadius.sm,
+    padding: 4,
+    alignSelf: 'flex-start',
+  },
+  toggleBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: theme.borderRadius.sm,
+  },
+  toggleBtnActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  toggleTextActive: {
+    color: theme.colors.text,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
+    color: theme.colors.text,
   },
   buttonRow: {
     flexDirection: "row",
@@ -247,29 +345,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#eef1f5",
+    borderTopColor: theme.colors.cardBorder,
   },
   personName: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: 17,
+    fontWeight: "600",
+    color: theme.colors.text,
   },
   personBalance: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
+    color: theme.colors.text,
   },
   emptyText: {
     fontSize: 15,
-    color: "#666",
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
   transactionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: "#eef1f5",
+    borderTopColor: theme.colors.cardBorder,
     gap: 12,
   },
   transactionLeft: {
@@ -277,31 +378,88 @@ const styles = StyleSheet.create({
   },
   transactionTitle: {
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
+    color: theme.colors.text,
     marginBottom: 4,
   },
   transactionDate: {
     fontSize: 13,
-    color: "#666",
+    color: theme.colors.textSecondary,
   },
   transactionNote: {
     fontSize: 14,
-    color: "#444",
+    color: theme.colors.textSecondary,
     marginTop: 6,
   },
   transactionAmount: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 17,
+    fontWeight: "800",
   },
   takeAmount: {
-    color: "#b42318",
+    color: theme.colors.danger,
   },
   repayAmount: {
-    color: "#067647",
+    color: theme.colors.success,
   },
   seeAllText: {
     fontSize: 14,
+    fontWeight: "700",
+    color: theme.colors.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "85%",
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: theme.colors.text,
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 14,
     fontWeight: "600",
-    color: "#111",
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    color: theme.colors.text,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 16,
+  },
+  modalCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  modalSave: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalSaveText: {
+    color: theme.colors.text,
   },
 });
