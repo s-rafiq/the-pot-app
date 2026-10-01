@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useRef } from "react";
 import {
   Alert,
   ScrollView,
@@ -8,12 +9,82 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Swipeable } from "react-native-gesture-handler";
 
 import { usePot } from "../context/PotContext";
 import { formatTransactionDate } from "../utils/date";
 import { getFundingEventTotals } from "../utils/pot";
 import { theme } from "../constants/theme";
 import { formatMoney } from "../utils/money";
+
+function FundingRow({
+  event,
+  gross,
+  deductions,
+  net,
+  onEdit,
+  onDelete,
+}: {
+  event: any;
+  gross: number;
+  deductions: number;
+  net: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const swipeRef = useRef<Swipeable>(null);
+
+  const renderRightActions = () => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        style={[styles.swipeBtn, styles.editBtn]}
+        onPress={() => { swipeRef.current?.close(); onEdit(); }}
+      >
+        <Text style={styles.swipeIcon}>•••</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.swipeBtn, styles.deleteBtn]}
+        onPress={() => { swipeRef.current?.close(); onDelete(); }}
+      >
+        <Text style={styles.swipeIcon}>🗑</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderRightActions={renderRightActions}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+    >
+      <View style={styles.eventRow}>
+        <View style={styles.eventLeft}>
+          <Text style={styles.eventTitle}>{event.title}</Text>
+          <Text style={styles.date}>
+            {formatTransactionDate(event.createdAt)}
+          </Text>
+
+          {event.note ? (
+            <Text style={styles.note}>{event.note}</Text>
+          ) : null}
+
+          <Text style={styles.detailText}>
+            Gross: £{formatMoney(gross)}
+          </Text>
+          <Text style={styles.detailText}>
+            Deductions: £{formatMoney(deductions)}
+          </Text>
+        </View>
+
+        <View style={styles.rightActions}>
+          <Text style={styles.netAmount}>+£{formatMoney(net)}</Text>
+        </View>
+      </View>
+    </Swipeable>
+  );
+}
 
 export default function FundingScreen() {
   const { fundingEvents, fundingEventDeductions, deleteFundingEvent } =
@@ -65,45 +136,15 @@ export default function FundingScreen() {
               );
 
               return (
-                <View key={event.id} style={styles.eventRow}>
-                  <View style={styles.eventLeft}>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
-                    <Text style={styles.date}>
-                      {formatTransactionDate(event.createdAt)}
-                    </Text>
-
-                    {event.note ? (
-                      <Text style={styles.note}>{event.note}</Text>
-                    ) : null}
-
-                    <Text style={styles.detailText}>
-                      Gross: £{formatMoney(gross)}
-                    </Text>
-                    <Text style={styles.detailText}>
-                      Deductions: £{formatMoney(deductions)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.rightActions}>
-                    <Text style={styles.netAmount}>+£{formatMoney(net)}</Text>
-
-                    <TouchableOpacity
-                      onPress={() => router.push(`/edit-funding/${event.id}`)}
-                      style={styles.actionButton}
-                    >
-                      <Text style={styles.editText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() =>
-                        handleDeleteFundingEvent(event.id, event.title)
-                      }
-                      style={styles.actionButton}
-                    >
-                      <Text style={styles.deleteText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <FundingRow
+                  key={event.id}
+                  event={event}
+                  gross={gross}
+                  deductions={deductions}
+                  net={net}
+                  onEdit={() => router.push(`/edit-funding/${event.id}`)}
+                  onDelete={() => handleDeleteFundingEvent(event.id, event.title)}
+                />
               );
             })
           )}
@@ -161,6 +202,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.cardBorder,
     paddingVertical: 12,
     gap: 12,
+    backgroundColor: theme.colors.card,
   },
   eventLeft: {
     flex: 1,
@@ -196,22 +238,25 @@ const styles = StyleSheet.create({
   },
   rightActions: {
     alignItems: "flex-end",
-    gap: 8,
   },
-
-  actionButton: {
-    paddingVertical: 4,
+  swipeActions: {
+    flexDirection: "row",
+    alignItems: "stretch",
   },
-
-  editText: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: "600",
+  swipeBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 70,
   },
-
-  deleteText: {
-    color: theme.colors.danger,
-    fontSize: 13,
-    fontWeight: "600",
+  editBtn: {
+    backgroundColor: theme.colors.primary,
+  },
+  deleteBtn: {
+    backgroundColor: theme.colors.danger,
+  },
+  swipeIcon: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

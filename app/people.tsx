@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   Alert,
   Modal,
@@ -11,11 +11,65 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Swipeable } from "react-native-gesture-handler";
 
 import { usePot } from "../context/PotContext";
 import { getPersonBalances } from "../utils/pot";
 import { theme } from "../constants/theme";
 import { formatMoney } from "../utils/money";
+
+function PersonRow({
+  person,
+  personBalance,
+  onEdit,
+  onDelete,
+}: {
+  person: { id: string; name: string };
+  personBalance: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const swipeRef = useRef<Swipeable>(null);
+
+  const renderRightActions = () => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        style={[styles.swipeBtn, styles.editBtn]}
+        onPress={() => { swipeRef.current?.close(); onEdit(); }}
+      >
+        <Text style={styles.swipeIcon}>•••</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.swipeBtn, styles.deleteBtn]}
+        onPress={() => { swipeRef.current?.close(); onDelete(); }}
+      >
+        <Text style={styles.swipeIcon}>🗑</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderRightActions={renderRightActions}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+    >
+      <View style={styles.personRow}>
+        <TouchableOpacity
+          style={styles.personMain}
+          onPress={() => router.push(`/person/${person.id}`)}
+        >
+          <Text style={styles.personName}>{person.name}</Text>
+          <Text style={styles.personBalance}>
+            £{formatMoney(personBalance)}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Swipeable>
+  );
+}
 
 export default function PeopleScreen() {
   const {
@@ -150,35 +204,13 @@ export default function PeopleScreen() {
               const personBalance = personBalances[person.id] ?? 0;
 
               return (
-                <View key={person.id} style={styles.personRow}>
-                  <TouchableOpacity
-                    style={styles.personMain}
-                    onPress={() => router.push(`/person/${person.id}`)}
-                  >
-                    <Text style={styles.personName}>{person.name}</Text>
-                    <Text style={styles.personBalance}>
-                      £{formatMoney(personBalance)}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.actionsRow}>
-                    <TouchableOpacity
-                      onPress={() =>
-                        handleOpenEditModal(person.id, person.name)
-                      }
-                      style={styles.actionButton}
-                    >
-                      <Text style={styles.actionButtonText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => handleDeletePerson(person.id, person.name)}
-                      style={styles.actionButton}
-                    >
-                      <Text style={styles.deleteActionText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <PersonRow
+                  key={person.id}
+                  person={person}
+                  personBalance={personBalance}
+                  onEdit={() => handleOpenEditModal(person.id, person.name)}
+                  onDelete={() => handleDeletePerson(person.id, person.name)}
+                />
               );
             })
           )}
@@ -308,14 +340,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: theme.colors.cardBorder,
-    paddingVertical: 12,
-    gap: 12,
+    backgroundColor: theme.colors.card,
   },
   personMain: {
     flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 8,
   },
   personName: {
     fontSize: 16,
@@ -386,14 +419,24 @@ const styles = StyleSheet.create({
   modalSaveText: {
     color: theme.colors.text,
   },
-  actionsRow: {
+  swipeActions: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    alignItems: "stretch",
   },
-
-  deleteActionText: {
-    color: theme.colors.danger,
-    fontWeight: "600",
+  swipeBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 70,
+  },
+  editBtn: {
+    backgroundColor: theme.colors.primary,
+  },
+  deleteBtn: {
+    backgroundColor: theme.colors.danger,
+  },
+  swipeIcon: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

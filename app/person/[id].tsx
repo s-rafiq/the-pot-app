@@ -15,20 +15,22 @@ import { usePot } from "../../context/PotContext";
 import { formatTransactionDate } from "../../utils/date";
 import { theme } from "../../constants/theme";
 import { formatMoney } from "../../utils/money";
+import { TransactionRow, EditTransactionModal } from "../../components/SharedTransaction";
+import type { Transaction } from "../../types/transaction";
 
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     people,
     transactions,
-    previousDebtEntries,
     deleteTransaction,
-    deletePreviousDebtEntry,
+    updateTransaction,
     myPersonId,
     setMyPersonId,
   } = usePot();
 
   const person = people.find((p) => p.id === id);
+  const [editTarget, setEditTarget] = useState<Transaction | null>(null);
 
   const isMe = myPersonId === id;
 
@@ -48,10 +50,6 @@ export default function PersonScreen() {
     return transactions.filter((t) => t.personId === id);
   }, [transactions, id]);
 
-  const personPreviousDebtEntries = useMemo(() => {
-    return previousDebtEntries.filter((entry) => entry.personId === id);
-  }, [previousDebtEntries, id]);
-
   const currentOwed = useMemo(() => {
     return Math.max(
       0,
@@ -61,18 +59,6 @@ export default function PersonScreen() {
       }, 0),
     );
   }, [personTransactions]);
-
-  const previousOwed = useMemo(() => {
-    return Math.max(
-      0,
-      personPreviousDebtEntries.reduce((total, entry) => {
-        if (entry.type === "debt") return total + entry.amount;
-        return total - entry.amount;
-      }, 0),
-    );
-  }, [personPreviousDebtEntries]);
-
-  const totalOwedOverall = currentOwed + previousOwed;
 
   const handleDeleteTransaction = (transactionId: string) => {
     Alert.alert(
@@ -96,27 +82,7 @@ export default function PersonScreen() {
     );
   };
 
-  const handleDeletePreviousDebtEntry = (entryId: string) => {
-    Alert.alert(
-      "Delete previous debt entry",
-      "Are you sure you want to delete this previous debt entry?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deletePreviousDebtEntry(entryId);
-            } catch (error) {
-              console.error("Failed to delete previous debt entry:", error);
-              Alert.alert("Error", "Could not delete previous debt entry.");
-            }
-          },
-        },
-      ],
-    );
-  };
+
 
   if (!person) {
     return (
@@ -141,20 +107,6 @@ export default function PersonScreen() {
           <Text style={styles.summaryValue}>£{formatMoney(currentOwed)}</Text>
         </View>
 
-        {previousOwed > 0 && (
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Previously Owed</Text>
-            <Text style={styles.summaryValue}>£{formatMoney(previousOwed)}</Text>
-          </View>
-        )}
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Total Owed Overall</Text>
-          <Text style={styles.summaryValue}>
-            £{formatMoney(totalOwedOverall)}
-          </Text>
-        </View>
-
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Transactions</Text>
 
@@ -162,115 +114,26 @@ export default function PersonScreen() {
             <Text style={styles.emptyText}>No transactions</Text>
           ) : (
             personTransactions.map((transaction) => (
-              <View key={transaction.id} style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text>
-                    {transaction.type === "take"
-                      ? "Withdrew from pot"
-                      : "Deposited to pot"}
-                  </Text>
-
-                  <Text style={styles.date}>
-                    {formatTransactionDate(transaction.createdAt)}
-                  </Text>
-
-                  {transaction.note ? (
-                    <Text style={styles.note}>{transaction.note}</Text>
-                  ) : null}
-                </View>
-
-                <View style={styles.rightActions}>
-                  <Text
-                    style={[
-                      styles.amountText,
-                      transaction.type === "take"
-                        ? styles.takeAmount
-                        : styles.repayAmount,
-                    ]}
-                  >
-                    {transaction.type === "take" ? "-" : "+"}£
-                    {formatMoney(transaction.amount)}
-                  </Text>
-
-                  <TouchableOpacity
-                    onPress={() =>
-                      router.push(`/edit-transaction/${transaction.id}`)
-                    }
-                    style={styles.deleteButton}
-                  >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => handleDeleteTransaction(transaction.id)}
-                    style={styles.deleteButton}
-                  >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Previously Owed</Text>
-
-          {personPreviousDebtEntries.length === 0 ? (
-            <Text style={styles.emptyText}>No previous debt entries</Text>
-          ) : (
-            personPreviousDebtEntries.map((entry) => (
-              <View key={entry.id} style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text>
-                    {entry.type === "debt"
-                      ? "Added previous debt"
-                      : "Repaid previous debt"}
-                  </Text>
-
-                  <Text style={styles.date}>
-                    {formatTransactionDate(entry.createdAt)}
-                  </Text>
-
-                  {entry.note ? (
-                    <Text style={styles.note}>{entry.note}</Text>
-                  ) : null}
-                </View>
-
-                <View style={styles.rightActions}>
-                  <Text
-                    style={[
-                      styles.amountText,
-                      entry.type === "debt"
-                        ? styles.takeAmount
-                        : styles.repayAmount,
-                    ]}
-                  >
-                    {entry.type === "debt" ? "+" : "-"}£
-                    {formatMoney(entry.amount)}
-                  </Text>
-
-                  <TouchableOpacity
-                    onPress={() =>
-                      router.push(`/edit-previous-debt/${entry.id}`)
-                    }
-                    style={styles.deleteButton}
-                  >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => handleDeletePreviousDebtEntry(entry.id)}
-                    style={styles.deleteButton}
-                  >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <TransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                people={people}
+                onEdit={setEditTarget}
+                onDelete={handleDeleteTransaction}
+              />
             ))
           )}
         </View>
       </ScrollView>
+
+      {editTarget && (
+        <EditTransactionModal
+          transaction={editTarget}
+          people={people}
+          onClose={() => setEditTarget(null)}
+          onSave={updateTransaction}
+        />
+      )}
     </SafeAreaView>
   );
 }
